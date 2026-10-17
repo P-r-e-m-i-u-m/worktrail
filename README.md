@@ -2,81 +2,75 @@
 
 # Worktrail
 
-**Close the laptop. Keep the thread.**
+**Pick up where your last session left off.**
 
-A tiny, local-first CLI for remembering what you were doing, what changed, and where to pick up next.
+A small local-first CLI that remembers what you were working on, what changed, and what to do next.
 
-No account. No cloud sync. No project management ceremony.
+[Getting started](#getting-started) · [Commands](#commands) · [How it works](#how-it-works)
+
+![Worktrail workflow](assets/worktrail-flow.svg)
 
 </div>
 
 ---
 
-You know the moment: you open a project, stare at the files, and spend the first 20 minutes trying to remember what you were doing.
+## The problem
 
-Worktrail gives that context a home. Start a session, leave yourself a note, and come back to a useful snapshot instead of a blank stare.
+You close your editor after a long session. Tomorrow, the code is still there, but the thread is gone.
 
-## A small tool for the gap between sessions
+Which bug were you chasing? What did you already try? What was the next step?
 
-```text
-$ worktrail start --task "Untangle the login flow"
-Session started: Untangle the login flow
+**Worktrail leaves a breadcrumb for your future self.** Start a session, save a checkpoint, and return to your own notes instead of reconstructing the whole day.
 
-$ worktrail checkpoint --note "API works; still need to cover expired tokens"
-Checkpoint saved.
-
-# Tomorrow, from the same project directory:
-$ worktrail resume
-Task: Untangle the login flow
-Started: 2026-10-17T12:10:00+00:00
-Checkpoint: 2026-10-17T12:42:00+00:00
-Branch: feature/login
-
-Notes:
-  [2026-10-17T12:42:00+00:00] API works; still need to cover expired tokens
-```
-
-*Example output for illustration.*
-
-## What it remembers
-
-- **The task** you're working on
-- **The last checkpoint** and when you saved it
-- **Notes to future-you**, in your own words
-- **A Git snapshot** of the branch and working-tree status
-
-Worktrail stores this in `.worktrail/session.json` inside the current directory. Your session stays with the project on your machine. Worktrail does not commit, edit, or restore your source files.
-
-## Get going
-
-**You need Python 3.10 or newer.**
-
-Clone the repository, open its folder, then install it:
+## See it in action
 
 ```powershell
+# Start where you're working
+worktrail start --task "Untangle the login flow"
+
+# Leave a useful note before stepping away
+worktrail checkpoint --note "API works; expired tokens still need tests"
+
+# Come back later
+worktrail resume
+worktrail status
+```
+
+Your session keeps the task, timestamps, notes, and a snapshot of your Git context.
+
+## Getting started
+
+Requires **Python 3.10+** and Git for repository context.
+
+Clone the repository and install it:
+
+```powershell
+git clone https://github.com/P-r-e-m-i-u-m/worktrail.git
+cd worktrail
 python -m pip install .
 ```
 
-Start a session from the project you want to track:
+Move into the project you want to track, then start a session:
 
 ```powershell
+cd path\to\your-project
 worktrail start --task "Build the settings page"
 ```
 
-Leave a breadcrumb before you stop:
+Before you stop working:
 
 ```powershell
 worktrail checkpoint --note "Layout is done; wire up save state next"
 ```
 
-When you come back:
+When you're back:
 
 ```powershell
 worktrail resume
 worktrail status
 ```
 
-Prefer not to install the command? Run it as a module from the repository:
+Prefer not to install the command? From the repository directory, use:
 
 ```powershell
 python -m worktrail start --task "Build the settings page"
@@ -84,46 +78,57 @@ python -m worktrail start --task "Build the settings page"
 
 ## Commands
 
-| Command | What it does |
+| Command | Purpose |
 | --- | --- |
 | `worktrail start --task "..."` | Start a session in the current directory |
 | `worktrail checkpoint` | Save a fresh Git snapshot |
 | `worktrail checkpoint --note "..."` | Save a snapshot and a note |
-| `worktrail resume` | Print the saved context and notes |
+| `worktrail resume` | Read your saved context and notes |
 | `worktrail status` | Compare current Git state with the last checkpoint |
+| `worktrail doctor` | Check setup and session-related conditions |
 
-A session is not silently overwritten. If one already exists, resume it first. Session data is local and can be removed by deleting the project's `.worktrail` directory.
+An existing session isn't silently overwritten. Resume it before starting another one.
 
-## Under the hood
+## How it works
 
-Worktrail is intentionally boring in the right places:
+Worktrail keeps its session data in:
 
-- Python standard library at runtime
-- Plain JSON you can inspect or back up
-- No account, daemon, database, or network calls
-- Git is queried for context, never used to change your repository
+```text
+your-project/
+└── .worktrail/
+    └── session.json
+```
 
-The Git snapshot is a point-in-time comparison, not a full history or a backup. Commit your code and back up your work separately.
+The file is plain JSON, so you can inspect it yourself. The session stays on your machine, inside the project you're tracking.
 
-## Hacking on Worktrail
+A few deliberate choices:
 
-Run the tests:
+- **Local first.** No account, cloud sync, database, or background service.
+- **Small runtime.** Uses Python's standard library.
+- **Git for context, not control.** Worktrail reads repository information but doesn't commit, edit, or restore your source files.
+- **Your code is still your responsibility.** A checkpoint is a point-in-time snapshot, not a backup or a replacement for Git history.
+
+## Working on Worktrail
+
+Run the test suite:
 
 ```powershell
 python -m unittest discover -s tests -v
 ```
 
-Build the distributable package:
+Build the package:
 
 ```powershell
 python -m pip install build
 python -m build
 ```
 
-## Where it is right now
+## Still taking shape
 
-Worktrail is an early, actively evolving project. The goal is to keep it useful, understandable, and small. If something feels clunky or missing, an issue with a concrete example is a great place to start.
+Worktrail is an early project, and I'd rather keep it small and useful than turn it into another project management platform.
+
+If you try it and something feels awkward, open an issue with the situation you ran into. Concrete examples are especially helpful.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE)

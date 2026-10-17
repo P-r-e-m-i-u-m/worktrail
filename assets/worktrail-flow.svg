@@ -1,0 +1,48 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="920" height="250" viewBox="0 0 920 250" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Worktrail workflow</title>
+  <desc id="desc">A four-step path from working, to saving a checkpoint, to closing the laptop, to resuming with context.</desc>
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="920" y2="250" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#171D2A"/>
+      <stop offset="1" stop-color="#10151F"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#9DABFF"/>
+      <stop offset="1" stop-color="#69E0C1"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="918" height="248" rx="20" fill="url(#panel)" stroke="#30394A"/>
+  <text x="34" y="38" fill="#9AA8BE" font-family="Segoe UI,Arial,sans-serif" font-size="11" letter-spacing="2.2">A BETTER WAY TO STOP AND START AGAIN</text>
+  <path d="M204 123H252M432 123H480M660 123H708" stroke="#536078" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 6"/>
+  <path d="M245 117L252 123L245 129M473 117L480 123L473 129M701 117L708 123L701 129" stroke="#8190AA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <g>
+    <rect x="28" y="69" width="176" height="108" rx="13" fill="#202A3A" stroke="#3B4960"/>
+    <circle cx="52" cy="93" r="11" fill="#303E56"/>
+    <path d="M47 93H57M52 88V98" stroke="#C3CEFF" stroke-width="1.7" stroke-linecap="round"/>
+    <text x="44" y="127" fill="#F0F3FA" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="600">Work</text>
+    <text x="44" y="149" fill="#A9B5C9" font-family="Segoe UI,Arial,sans-serif" font-size="11">Build, debug, explore</text>
+  </g>
+  <g>
+    <rect x="256" y="69" width="176" height="108" rx="13" fill="#202A3A" stroke="#3B4960"/>
+    <circle cx="280" cy="93" r="11" fill="#303E56"/>
+    <path d="M275 88H285V98H275Z M278 91H282M278 94H282" stroke="#C3CEFF" stroke-width="1.4" stroke-linejoin="round"/>
+    <text x="272" y="127" fill="#F0F3FA" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="600">Checkpoint</text>
+    <text x="272" y="149" fill="#A9B5C9" font-family="Segoe UI,Arial,sans-serif" font-size="11">Save the useful details</text>
+  </g>
+  <g>
+    <rect x="484" y="69" width="176" height="108" rx="13" fill="#202A3A" stroke="#3B4960"/>
+    <circle cx="508" cy="93" r="11" fill="#303E56"/>
+    <path d="M501 91H515V98H501Z M503 88H513V91" stroke="#C3CEFF" stroke-width="1.4" stroke-linejoin="round"/>
+    <text x="500" y="127" fill="#F0F3FA" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="600">Step away</text>
+    <text x="500" y="149" fill="#A9B5C9" font-family="Segoe UI,Arial,sans-serif" font-size="11">Close the laptop</text>
+  </g>
+  <g>
+    <rect x="712" y="69" width="180" height="108" rx="13" fill="#202A3A" stroke="#6478A3"/>
+    <rect x="728" y="82" width="22" height="22" rx="11" fill="#263F48"/>
+    <path d="M734 93L738 97L745 89" stroke="url(#accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="728" y="127" fill="#F0F3FA" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="600">Resume</text>
+    <text x="728" y="149" fill="#A9B5C9" font-family="Segoe UI,Arial,sans-serif" font-size="11">Pick up the thread</text>
+  </g>
+  <text x="34" y="218" fill="#77869F" font-family="Consolas,monospace" font-size="11">.worktrail/session.json</text>
+  <text x="886" y="218" text-anchor="end" fill="#8190AA" font-family="Segoe UI,Arial,sans-serif" font-size="11">Your project. Your context.</text>
+</svg>
