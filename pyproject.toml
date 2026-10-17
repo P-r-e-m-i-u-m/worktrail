@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "worktrail"
+version = "0.1.0"
+description = "A local-first CLI for saving and resuming developer work sessions."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Aman" }
+]
+dependencies = []
+
+[project.scripts]
+worktrail = "worktrail.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["worktrail*"]
