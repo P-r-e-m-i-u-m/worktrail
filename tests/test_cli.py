@@ -1,4 +1,5 @@
-﻿"""Worktrail tests."""
+"""Tests for Worktrail's command-line interface."""
+
 import contextlib
 import io
 import tempfile
@@ -17,7 +18,7 @@ class WorktrailTests(unittest.TestCase):
         self.cwd.start()
         self.git_snapshot = patch(
             "worktrail.cli.snapshot",
-            return_value={"branch": None, "git_status": None},
+            return_value={"branch": "main", "git_status": ""},
         )
         self.git_snapshot.start()
 
@@ -32,19 +33,34 @@ class WorktrailTests(unittest.TestCase):
             code = cli.main(list(args))
         return code, out.getvalue(), err.getvalue()
 
+    def test_version(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as exit_info:
+            cli.main(["--version"])
+        self.assertEqual(exit_info.exception.code, 0)
+        self.assertIn("worktrail 0.1.0", out.getvalue())
+
     def test_start_and_resume(self):
         code, _, _ = self.run_cli("start", "--task", "Fix login")
         self.assertEqual(code, 0)
         code, output, _ = self.run_cli("resume")
         self.assertEqual(code, 0)
         self.assertIn("Fix login", output)
+        self.assertIn("Branch:     main", output)
 
     def test_checkpoint_saves_note(self):
         self.run_cli("start", "--task", "Fix login")
-        code, _, _ = self.run_cli("checkpoint", "--note", "Tests pending")
+        code, output, _ = self.run_cli("checkpoint", "--note", "Tests pending")
         self.assertEqual(code, 0)
+        self.assertIn("Future-you", output)
         _, output, _ = self.run_cli("resume")
         self.assertIn("Tests pending", output)
+
+    def test_checkpoint_without_note_updates_snapshot(self):
+        self.run_cli("start", "--task", "Fix login")
+        code, output, _ = self.run_cli("checkpoint")
+        self.assertEqual(code, 0)
+        self.assertIn("Checkpoint saved", output)
 
     def test_existing_session_is_not_overwritten(self):
         self.run_cli("start", "--task", "First task")
@@ -63,8 +79,7 @@ class WorktrailTests(unittest.TestCase):
         session_dir = self.root / ".worktrail"
         session_dir.mkdir()
         (session_dir / "session.json").write_text(
-            '{"task": "Broken", "notes": null}',
-            encoding="utf-8",
+            '{"task": "Broken", "notes": null}', encoding="utf-8"
         )
         code, _, error = self.run_cli("resume")
         self.assertEqual(code, 1)
@@ -74,6 +89,23 @@ class WorktrailTests(unittest.TestCase):
         code, _, error = self.run_cli("start", "--task", "  ")
         self.assertEqual(code, 1)
         self.assertIn("Task cannot be empty", error)
+
+    def test_status_reports_changes(self):
+        self.run_cli("start", "--task", "Fix login")
+        with patch(
+            "worktrail.cli.snapshot",
+            return_value={"branch": "feature/login", "git_status": " M app.py"},
+        ):
+            code, output, _ = self.run_cli("status")
+        self.assertEqual(code, 0)
+        self.assertIn("Branch has changed", output)
+        self.assertIn("Working tree has changed", output)
+
+    def test_unicode_notes_round_trip(self):
+        self.run_cli("start", "--task", "Fix login")
+        self.run_cli("checkpoint", "--note", "Café ☕")
+        _, output, _ = self.run_cli("resume")
+        self.assertIn("Café ☕", output)
 
 
 if __name__ == "__main__":

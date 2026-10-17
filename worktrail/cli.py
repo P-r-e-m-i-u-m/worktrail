@@ -1,4 +1,4 @@
-﻿"""Local-first development session tracker."""
+"""Local-first development session tracker."""
 
 import argparse
 import json
@@ -7,12 +7,15 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from . import __version__
+
 
 def timestamp():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def snapshot(root):
+    """Capture Git context without changing the repository."""
     result = {"branch": None, "git_status": None}
     for key, args in (
         ("branch", ["branch", "--show-current"]),
@@ -21,7 +24,10 @@ def snapshot(root):
         try:
             proc = subprocess.run(
                 ["git", "-C", str(root), *args],
-                capture_output=True, text=True, timeout=5, check=False,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
             )
             if proc.returncode == 0:
                 result[key] = proc.stdout.strip()
@@ -35,6 +41,7 @@ def session_file(root):
 
 
 def load(root):
+    """Load a session, rejecting malformed data instead of guessing."""
     path = session_file(root)
     if not path.exists():
         return None
@@ -42,6 +49,7 @@ def load(root):
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Cannot read session: {exc}") from exc
+
     if (
         not isinstance(data, dict)
         or not isinstance(data.get("task"), str)
@@ -61,10 +69,14 @@ def load(root):
 
 
 def save(root, data):
+    """Replace the session file only after the complete JSON is written."""
     path = session_file(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    temporary.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
     temporary.replace(path)
 
 
@@ -77,18 +89,22 @@ def require_session(root):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        prog="worktrail", description="Keep track of development sessions."
+        prog="worktrail",
+        description="Leave a trail for the next time you open your project.",
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"%(prog)s {__version__}"
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
     start = commands.add_parser("start", help="Start a session")
-    start.add_argument("--task", required=True)
+    start.add_argument("--task", required=True, help="What you're working on")
 
-    checkpoint = commands.add_parser("checkpoint", help="Save progress")
-    checkpoint.add_argument("--note", help="Add a progress note")
+    checkpoint = commands.add_parser("checkpoint", help="Save your progress")
+    checkpoint.add_argument("--note", help="Leave a note for future-you")
 
-    commands.add_parser("resume", help="Show saved session context")
-    commands.add_parser("status", help="Compare Git state with checkpoint")
+    commands.add_parser("resume", help="Show the saved session context")
+    commands.add_parser("status", help="Compare Git state with your checkpoint")
     args = parser.parse_args(argv)
     root = Path.cwd()
 
@@ -99,7 +115,7 @@ def main(argv=None):
                 raise ValueError("Task cannot be empty.")
             if load(root) is not None:
                 raise ValueError(
-                    "A session already exists. Resume it before starting another."
+                    "A session already exists. Run 'worktrail resume' to see it."
                 )
             now = timestamp()
             data = {
@@ -111,50 +127,59 @@ def main(argv=None):
             }
             save(root, data)
             print(f"Session started: {task}")
+            print("Leave a note any time with 'worktrail checkpoint --note \"...\"'.")
             return 0
 
         if args.command == "checkpoint":
             data = require_session(root)
             if args.note is not None:
-                if not args.note.strip():
+                note = args.note.strip()
+                if not note:
                     raise ValueError("Note cannot be empty.")
-                data["notes"].append({
-                    "at": timestamp(), "text": args.note.strip()
-                })
+                data["notes"].append({"at": timestamp(), "text": note})
             data.update(snapshot(root))
             data["checkpoint_at"] = timestamp()
             save(root, data)
             print("Checkpoint saved.")
+            if args.note is not None:
+                print("Future-you will thank you.")
             return 0
 
         data = require_session(root)
 
         if args.command == "resume":
-            print(f"Task: {data['task']}")
-            print(f"Started: {data['started_at']}")
+            print(f"Task:       {data['task']}")
+            print(f"Started:    {data['started_at']}")
             print(f"Checkpoint: {data['checkpoint_at']}")
-            print(f"Branch: {data.get('branch') or 'unavailable'}")
+            print(f"Branch:     {data.get('branch') or 'unavailable'}")
             print("\nNotes:")
             if not data["notes"]:
-                print("  No notes yet.")
+                print("  Nothing written down yet.")
             for note in data["notes"]:
                 print(f"  [{note['at']}] {note['text']}")
             return 0
 
         if args.command == "status":
             current = snapshot(root)
-            print(f"Task: {data['task']}")
+            print(f"Task:       {data['task']}")
             print(f"Checkpoint: {data['checkpoint_at']}")
             if current["branch"] is None:
-                print("Git: unavailable or not a repository")
+                print("Git:        unavailable or not a repository")
+                return 0
+
+            print(f"Branch:     {current['branch']}")
+            branch_changed = current["branch"] != data.get("branch")
+            tree_changed = current["git_status"] != data.get("git_status")
+
+            if branch_changed:
+                print("Branch has changed since the last checkpoint.")
             else:
-                print(f"Branch: {current['branch']}")
-                if current["branch"] != data.get("branch"):
-                    print("Branch changed since checkpoint.")
-                if current["git_status"] != data.get("git_status"):
-                    print("Working tree changed since checkpoint.")
-                else:
-                    print("Working tree matches checkpoint.")
+                print("Branch matches the last checkpoint.")
+
+            if tree_changed:
+                print("Working tree has changed since the last checkpoint.")
+            else:
+                print("Working tree matches the last checkpoint.")
             return 0
 
     except (ValueError, OSError, KeyError, TypeError) as exc:
