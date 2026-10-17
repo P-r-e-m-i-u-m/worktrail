@@ -17,6 +17,7 @@ def timestamp():
 def snapshot(root):
     """Capture Git context without changing the repository."""
     result = {"branch": None, "git_status": None}
+
     for key, args in (
         ("branch", ["branch", "--show-current"]),
         ("git_status", ["status", "--short", "--untracked-files=all"]),
@@ -33,6 +34,7 @@ def snapshot(root):
                 result[key] = proc.stdout.strip()
         except (OSError, subprocess.TimeoutExpired):
             pass
+
     return result
 
 
@@ -43,8 +45,10 @@ def session_file(root):
 def load(root):
     """Load a session, rejecting malformed data instead of guessing."""
     path = session_file(root)
+
     if not path.exists():
         return None
+
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -65,6 +69,7 @@ def load(root):
         )
     ):
         raise ValueError("Session file has an invalid format.")
+
     return data
 
 
@@ -73,6 +78,7 @@ def save(root, data):
     path = session_file(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
+
     temporary.write_text(
         json.dumps(data, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
@@ -82,9 +88,81 @@ def save(root, data):
 
 def require_session(root):
     data = load(root)
+
     if data is None:
         raise ValueError("No session found. Run 'worktrail start' first.")
+
     return data
+
+
+def run_doctor(root):
+    """Check common Worktrail setup issues without changing files."""
+    checks = []
+
+    git = snapshot(root)
+    git_available = git["branch"] is not None
+
+    checks.append(
+        (
+            "Git repository",
+            git_available,
+            "Git context available"
+            if git_available
+            else "Not inside a Git repository",
+        )
+    )
+
+    try:
+        data = load(root)
+
+        if data is None:
+            checks.append(
+                (
+                    "Session",
+                    True,
+                    "No session yet. Run 'worktrail start --task \"...\"'.",
+                )
+            )
+        else:
+            checks.append(
+                ("Session", True, f"Session found: {data['task']}")
+            )
+
+    except (ValueError, OSError) as exc:
+        checks.append(("Session", False, str(exc)))
+
+    ignore_file = root / ".gitignore"
+
+    try:
+        ignore_text = (
+            ignore_file.read_text(encoding="utf-8")
+            if ignore_file.is_file()
+            else ""
+        )
+
+        ignored = any(
+            line.strip() in {".worktrail/", ".worktrail"}
+            for line in ignore_text.splitlines()
+        )
+
+        checks.append(
+            (
+                ".worktrail ignored",
+                ignored,
+                "Session data is listed in .gitignore"
+                if ignored
+                else "Add .worktrail/ to .gitignore to keep session data local",
+            )
+        )
+
+    except OSError as exc:
+        checks.append((".worktrail ignored", False, str(exc)))
+
+    for name, passed, message in checks:
+        marker = "OK" if passed else "WARN"
+        print(f"[{marker}] {name}: {message}")
+
+    return 0 if all(passed for _, passed, _ in checks) else 1
 
 
 def main(argv=None):
@@ -93,30 +171,50 @@ def main(argv=None):
         description="Leave a trail for the next time you open your project.",
     )
     parser.add_argument(
-        "--version", action="version", version=f"%(prog)s {__version__}"
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
+
     commands = parser.add_subparsers(dest="command", required=True)
 
     start = commands.add_parser("start", help="Start a session")
     start.add_argument("--task", required=True, help="What you're working on")
 
-    checkpoint = commands.add_parser("checkpoint", help="Save your progress")
+    checkpoint = commands.add_parser(
+        "checkpoint",
+        help="Save your progress",
+    )
     checkpoint.add_argument("--note", help="Leave a note for future-you")
 
     commands.add_parser("resume", help="Show the saved session context")
-    commands.add_parser("status", help="Compare Git state with your checkpoint")
+    commands.add_parser(
+        "status",
+        help="Compare Git state with your checkpoint",
+    )
+    commands.add_parser(
+        "doctor",
+        help="Check this project's Worktrail setup",
+    )
+
     args = parser.parse_args(argv)
     root = Path.cwd()
 
     try:
+        if args.command == "doctor":
+            return run_doctor(root)
+
         if args.command == "start":
             task = args.task.strip()
+
             if not task:
                 raise ValueError("Task cannot be empty.")
+
             if load(root) is not None:
                 raise ValueError(
                     "A session already exists. Run 'worktrail resume' to see it."
                 )
+
             now = timestamp()
             data = {
                 "task": task,
@@ -125,24 +223,37 @@ def main(argv=None):
                 "notes": [],
                 **snapshot(root),
             }
+
             save(root, data)
             print(f"Session started: {task}")
-            print("Leave a note any time with 'worktrail checkpoint --note \"...\"'.")
+            print(
+                "Leave a note any time with "
+                "'worktrail checkpoint --note \"...\"'."
+            )
             return 0
 
         if args.command == "checkpoint":
             data = require_session(root)
+
             if args.note is not None:
                 note = args.note.strip()
+
                 if not note:
                     raise ValueError("Note cannot be empty.")
-                data["notes"].append({"at": timestamp(), "text": note})
+
+                data["notes"].append(
+                    {"at": timestamp(), "text": note}
+                )
+
             data.update(snapshot(root))
             data["checkpoint_at"] = timestamp()
             save(root, data)
+
             print("Checkpoint saved.")
+
             if args.note is not None:
                 print("Future-you will thank you.")
+
             return 0
 
         data = require_session(root)
@@ -153,21 +264,27 @@ def main(argv=None):
             print(f"Checkpoint: {data['checkpoint_at']}")
             print(f"Branch:     {data.get('branch') or 'unavailable'}")
             print("\nNotes:")
+
             if not data["notes"]:
                 print("  Nothing written down yet.")
+
             for note in data["notes"]:
                 print(f"  [{note['at']}] {note['text']}")
+
             return 0
 
         if args.command == "status":
             current = snapshot(root)
+
             print(f"Task:       {data['task']}")
             print(f"Checkpoint: {data['checkpoint_at']}")
+
             if current["branch"] is None:
                 print("Git:        unavailable or not a repository")
                 return 0
 
             print(f"Branch:     {current['branch']}")
+
             branch_changed = current["branch"] != data.get("branch")
             tree_changed = current["git_status"] != data.get("git_status")
 
@@ -180,6 +297,7 @@ def main(argv=None):
                 print("Working tree has changed since the last checkpoint.")
             else:
                 print("Working tree matches the last checkpoint.")
+
             return 0
 
     except (ValueError, OSError, KeyError, TypeError) as exc:
