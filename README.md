@@ -33,6 +33,7 @@ worktrail checkpoint --note "API works; expired tokens still need tests"
 
 # Come back later
 worktrail resume
+worktrail history
 worktrail status
 ```
 
@@ -84,6 +85,7 @@ python -m worktrail start --task "Build the settings page"
 | `worktrail checkpoint` | Save a fresh Git snapshot |
 | `worktrail checkpoint --note "..."` | Save a snapshot and a note |
 | `worktrail resume` | Read your saved context and notes |
+| `worktrail history` | Compare the current session with its previous saved version |
 | `worktrail status` | Compare current Git state with the last checkpoint |
 | `worktrail doctor` | Check setup and session-related conditions |
 
