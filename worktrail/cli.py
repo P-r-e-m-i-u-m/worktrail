@@ -165,6 +165,55 @@ def run_doctor(root):
     return 0 if all(passed for _, passed, _ in checks) else 1
 
 
+
+def render_handoff(data, current, next_step=None):
+    """Build a portable Markdown summary of the current work session."""
+    lines = [
+        f"# Work handoff: {data['task']}",
+        "",
+        "## Current task",
+        data["task"],
+        "",
+        "## Session",
+        f"- Started: {data['started_at']}",
+        f"- Last checkpoint: {data['checkpoint_at']}",
+        f"- Current branch: {current.get('branch') or 'unavailable'}",
+        "",
+        "## Git working tree",
+    ]
+
+    status = current.get("git_status")
+    if current.get("branch") is None:
+        lines.append("Git context is unavailable or this is not a repository.")
+    elif status:
+        lines.extend(["```text", status, "```"])
+    else:
+        lines.append("Working tree is clean.")
+
+    lines.extend(["", "## Notes"])
+    if data["notes"]:
+        for note in data["notes"]:
+            lines.append(f"- [{note['at']}] {note['text']}")
+    else:
+        lines.append("- No notes recorded yet.")
+
+    lines.extend(["", "## Next step"])
+    lines.append(next_step if next_step else "Not recorded yet.")
+    lines.extend([
+        "",
+        "## Instructions for the next session",
+        "Continue from the context above. Inspect the current code before editing,",
+        "preserve existing work, and run focused tests before reporting completion.",
+        "",
+    ])
+    return "\n".join(lines)
+
+
+def write_handoff(path, content):
+    """Create a handoff file without overwriting an existing file."""
+    with path.open("x", encoding="utf-8", newline="\n") as stream:
+        stream.write(content)
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="worktrail",
@@ -195,6 +244,21 @@ def main(argv=None):
     commands.add_parser(
         "doctor",
         help="Check this project's Worktrail setup",
+    )
+
+    handoff = commands.add_parser(
+        "handoff",
+        help="Prepare a Markdown handoff for your next coding session",
+    )
+    handoff.add_argument(
+        "--next",
+        dest="next_step",
+        help="Record the next step without making Worktrail guess",
+    )
+    handoff.add_argument(
+        "--output",
+        type=Path,
+        help="Save the handoff to a new file instead of printing it",
     )
 
     args = parser.parse_args(argv)
@@ -257,6 +321,24 @@ def main(argv=None):
             return 0
 
         data = require_session(root)
+
+        if args.command == "handoff":
+            next_step = args.next_step
+            if next_step is not None and not next_step.strip():
+                raise ValueError("Next step cannot be empty.")
+
+            content = render_handoff(
+                data,
+                snapshot(root),
+                next_step=next_step.strip() if next_step is not None else None,
+            )
+
+            if args.output is not None:
+                write_handoff(args.output, content)
+                print(f"Handoff saved: {args.output}")
+            else:
+                print(content, end="")
+            return 0
 
         if args.command == "resume":
             print(f"Task:       {data['task']}")

@@ -33,6 +33,41 @@ class WorktrailTests(unittest.TestCase):
             code = cli.main(list(args))
         return code, out.getvalue(), err.getvalue()
 
+    def test_handoff_includes_notes_git_context_and_next_step(self):
+        self.run_cli("start", "--task", "Fix login")
+        self.run_cli("checkpoint", "--note", "Token refresh still fails")
+        with patch(
+            "worktrail.cli.snapshot",
+            return_value={"branch": "feature/login", "git_status": " M app.py"},
+        ):
+            code, output, error = self.run_cli(
+                "handoff", "--next", "Add expired-token tests"
+            )
+
+        self.assertEqual(code, 0, error)
+        self.assertIn("# Work handoff: Fix login", output)
+        self.assertIn("Token refresh still fails", output)
+        self.assertIn("feature/login", output)
+        self.assertIn(" M app.py", output)
+        self.assertIn("Add expired-token tests", output)
+
+    def test_handoff_output_does_not_overwrite(self):
+        self.run_cli("start", "--task", "Fix login")
+        target = self.root / "handoff.md"
+        target.write_text("keep this file", encoding="utf-8")
+
+        code, _, error = self.run_cli("handoff", "--output", str(target))
+
+        self.assertEqual(code, 1)
+        self.assertIn("File exists", error)
+        self.assertEqual(target.read_text(encoding="utf-8"), "keep this file")
+
+    def test_handoff_rejects_blank_next_step(self):
+        self.run_cli("start", "--task", "Fix login")
+        code, _, error = self.run_cli("handoff", "--next", "   ")
+        self.assertEqual(code, 1)
+        self.assertIn("Next step cannot be empty", error)
+
     def test_version(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as exit_info:
