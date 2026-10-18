@@ -158,6 +158,34 @@ class WorktrailTests(unittest.TestCase):
         self.assertIn("Cannot read session", error)
         self.assertFalse((folder / "session.json").exists())
 
+    def test_history_shows_current_and_previous_saved_session(self):
+        self.run_cli("start", "--task", "Fix login")
+        self.run_cli("checkpoint", "--note", "First saved note")
+        self.run_cli("checkpoint", "--note", "Second saved note")
+
+        code, output, error = self.run_cli("history")
+
+        self.assertEqual(code, 0, error)
+        self.assertIn("Current session", output)
+        self.assertIn("Previous saved version (session.json.bak)", output)
+        self.assertIn("Fix login", output)
+        self.assertIn("Notes:      2", output)
+        self.assertIn("Notes:      1", output)
+
+    def test_history_explains_when_no_backup_exists(self):
+        self.run_cli("start", "--task", "Fix login")
+
+        code, output, error = self.run_cli("history")
+
+        self.assertEqual(code, 0, error)
+        self.assertIn("no backup yet", output)
+
+    def test_history_fails_when_no_session_or_backup_exists(self):
+        code, _, error = self.run_cli("history")
+
+        self.assertEqual(code, 1)
+        self.assertIn("No current session or recovery backup found", error)
+
     def test_version(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as exit_info:
