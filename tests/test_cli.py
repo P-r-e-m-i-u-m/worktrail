@@ -112,6 +112,52 @@ class WorktrailTests(unittest.TestCase):
         self.assertEqual(code, 1, error)
         self.assertIn("[WARN] .worktrail ignored: fatal: not a git repository", output)
 
+    def test_recover_restores_last_saved_session_when_current_is_missing(self):
+        self.run_cli("start", "--task", "Fix login")
+        self.run_cli("checkpoint", "--note", "Newer progress")
+        current = self.root / ".worktrail" / "session.json"
+        backup = self.root / ".worktrail" / "session.json.bak"
+
+        self.assertTrue(backup.exists())
+        current.unlink()
+
+        code, output, error = self.run_cli("recover")
+
+        self.assertEqual(code, 0, error)
+        self.assertIn("Session recovered: Fix login", output)
+        self.assertTrue(backup.exists())
+        _, resumed, _ = self.run_cli("resume")
+        self.assertNotIn("Newer progress", resumed)
+
+    def test_recover_never_overwrites_existing_session(self):
+        self.run_cli("start", "--task", "Original task")
+        self.run_cli("checkpoint", "--note", "Backup note")
+        current = self.root / ".worktrail" / "session.json"
+        before = current.read_text(encoding="utf-8")
+
+        code, _, error = self.run_cli("recover")
+
+        self.assertEqual(code, 1)
+        self.assertIn("will not overwrite it", error)
+        self.assertEqual(current.read_text(encoding="utf-8"), before)
+
+    def test_recover_fails_cleanly_without_backup(self):
+        code, _, error = self.run_cli("recover")
+
+        self.assertEqual(code, 1)
+        self.assertIn("No recovery backup found", error)
+
+    def test_recover_rejects_malformed_backup_without_creating_session(self):
+        folder = self.root / ".worktrail"
+        folder.mkdir()
+        (folder / "session.json.bak").write_text("{broken", encoding="utf-8")
+
+        code, _, error = self.run_cli("recover")
+
+        self.assertEqual(code, 1)
+        self.assertIn("Cannot read session", error)
+        self.assertFalse((folder / "session.json").exists())
+
     def test_version(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as exit_info:

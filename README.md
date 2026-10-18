@@ -96,10 +96,11 @@ Worktrail keeps its session data in:
 ```text
 your-project/
 └── .worktrail/
-    └── session.json
+    ├── session.json
+    └── session.json.bak
 ```
 
-The file is plain JSON, so you can inspect it yourself. The session stays on your machine, inside the project you're tracking.
+The files are plain JSON, so you can inspect them yourself. Before replacing an existing session, Worktrail preserves the previous version in `session.json.bak`. If the current session disappears, `worktrail recover` restores that backup without overwriting an existing session. The session stays on your machine, inside the project you're tracking.
 
 A few deliberate choices:
 
