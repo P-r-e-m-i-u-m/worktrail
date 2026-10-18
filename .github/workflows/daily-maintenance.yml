@@ -1,0 +1,75 @@
+name: Daily maintenance
+
+on:
+  schedule:
+    - cron: "17 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: daily-maintenance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package
+        run: python -m pip install .
+      - name: Compile package
+        run: python -m compileall -q worktrail
+      - name: Run tests
+        run: python -m unittest discover -s tests -v
+
+  report:
+    name: Publish daily result
+    if: always()
+    needs: [test]
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      actions: read
+      contents: read
+    steps:
+      - name: Comment on maintenance log
+        uses: actions/github-script@v7
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+        with:
+          script: |
+            const issue_number = 6;
+            const result = process.env.TEST_RESULT;
+            const date = new Date().toISOString().slice(0, 10);
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const status = result === 'success' ? 'PASSED' : result === 'failure' ? 'FAILED' : result.toUpperCase();
+            const body = [
+              `### Daily check — ${date} (UTC)`,
+              '',
+              `- **Result:** ${status}`,
+              '- **Coverage:** 4 Python versions (3.10–3.13) on Ubuntu and Windows',
+              '- **Checks:** package install, Python compile check, and the full unittest suite',
+              `- **Run:** [View actual logs](${runUrl})`,
+              '',
+              '_Automated report from GitHub Actions; no code is changed or merged by this workflow._'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              body
+            });
