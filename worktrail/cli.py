@@ -288,6 +288,10 @@ def main(argv=None):
 
     commands.add_parser("resume", help="Show the saved session context")
     commands.add_parser(
+        "history",
+        help="Show the current session and its previous saved version",
+    )
+    commands.add_parser(
         "recover",
         help="Restore a missing session from its last saved backup",
     )
@@ -326,6 +330,34 @@ def main(argv=None):
             data = recover(root)
             print(f"Session recovered: {data['task']}")
             print("Recovery backup was kept unchanged.")
+            return 0
+
+        if args.command == "history":
+            current_path = session_file(root)
+            backup_path = backup_file(root)
+            current = load_path(current_path)
+            previous = load_path(backup_path)
+
+            if current is None and previous is None:
+                raise ValueError("No current session or recovery backup found.")
+
+            if current is not None:
+                print("Current session")
+                print(f"  Task:       {current['task']}")
+                print(f"  Checkpoint: {current['checkpoint_at']}")
+                print(f"  Notes:      {len(current['notes'])}")
+            else:
+                print("Current session: missing")
+
+            if previous is not None:
+                print("\\nPrevious saved version (session.json.bak)")
+                print(f"  Task:       {previous['task']}")
+                print(f"  Checkpoint: {previous['checkpoint_at']}")
+                print(f"  Notes:      {len(previous['notes'])}")
+            elif backup_path.exists():
+                print("\\nPrevious saved version: backup exists but is invalid")
+            else:
+                print("\\nPrevious saved version: no backup yet")
             return 0
 
         if args.command == "start":
