@@ -131,31 +131,40 @@ def run_doctor(root):
     except (ValueError, OSError) as exc:
         checks.append(("Session", False, str(exc)))
 
-    ignore_file = root / ".gitignore"
-
     try:
-        ignore_text = (
-            ignore_file.read_text(encoding="utf-8")
-            if ignore_file.is_file()
-            else ""
+        proc = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "check-ignore",
+                "--quiet",
+                "--",
+                ".worktrail/session.json",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
         )
 
-        ignored = any(
-            line.strip() in {".worktrail/", ".worktrail"}
-            for line in ignore_text.splitlines()
-        )
-
-        checks.append(
-            (
-                ".worktrail ignored",
-                ignored,
-                "Session data is listed in .gitignore"
-                if ignored
-                else "Add .worktrail/ to .gitignore to keep session data local",
+        if proc.returncode == 0:
+            ignored = True
+            message = "Git rules ignore .worktrail/session.json"
+        elif proc.returncode == 1:
+            ignored = False
+            message = (
+                "Git does not ignore .worktrail/session.json; "
+                "add .worktrail/ to an applicable ignore file"
             )
-        )
+        else:
+            ignored = False
+            detail = proc.stderr.strip() or "Git could not evaluate ignore rules"
+            message = detail
 
-    except OSError as exc:
+        checks.append((".worktrail ignored", ignored, message))
+
+    except (OSError, subprocess.TimeoutExpired) as exc:
         checks.append((".worktrail ignored", False, str(exc)))
 
     for name, passed, message in checks:

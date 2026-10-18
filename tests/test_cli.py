@@ -68,6 +68,50 @@ class WorktrailTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("Next step cannot be empty", error)
 
+    def test_doctor_passes_when_git_ignores_session_file(self):
+        from unittest.mock import Mock
+
+        with patch(
+            "worktrail.cli.subprocess.run",
+            return_value=Mock(returncode=0, stdout="", stderr=""),
+        ) as run:
+            code, output, error = self.run_cli("doctor")
+
+        self.assertEqual(code, 0, error)
+        self.assertIn(
+            "[OK] .worktrail ignored: Git rules ignore .worktrail/session.json",
+            output,
+        )
+        self.assertIn("check-ignore", run.call_args.args[0])
+
+    def test_doctor_warns_when_git_does_not_ignore_session_file(self):
+        from unittest.mock import Mock
+
+        with patch(
+            "worktrail.cli.subprocess.run",
+            return_value=Mock(returncode=1, stdout="", stderr=""),
+        ):
+            code, output, error = self.run_cli("doctor")
+
+        self.assertEqual(code, 1, error)
+        self.assertIn("[WARN] .worktrail ignored:", output)
+        self.assertIn(
+            "Git does not ignore .worktrail/session.json",
+            output,
+        )
+
+    def test_doctor_warns_when_git_ignore_check_fails(self):
+        from unittest.mock import Mock
+
+        with patch(
+            "worktrail.cli.subprocess.run",
+            return_value=Mock(returncode=128, stdout="", stderr="fatal: not a git repository"),
+        ):
+            code, output, error = self.run_cli("doctor")
+
+        self.assertEqual(code, 1, error)
+        self.assertIn("[WARN] .worktrail ignored: fatal: not a git repository", output)
+
     def test_version(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as exit_info:
