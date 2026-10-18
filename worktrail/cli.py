@@ -42,10 +42,8 @@ def session_file(root):
     return root / ".worktrail" / "session.json"
 
 
-def load(root):
-    """Load a session, rejecting malformed data instead of guessing."""
-    path = session_file(root)
-
+def load_path(path):
+    """Load and validate a session file without guessing at malformed data."""
     if not path.exists():
         return None
 
@@ -73,17 +71,60 @@ def load(root):
     return data
 
 
+def load(root):
+    """Load the current session, if one exists."""
+    return load_path(session_file(root))
+
+
+def backup_file(root):
+    return session_file(root).with_suffix(".json.bak")
+
+
 def save(root, data):
-    """Replace the session file only after the complete JSON is written."""
+    """Atomically save a session and preserve the previous valid version."""
     path = session_file(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
+    backup = backup_file(root)
+    backup_temporary = backup.with_suffix(".tmp")
+
+    if path.exists():
+        # Preserve the previous session before replacing it. Never overwrite
+        # a backup until its complete contents have been written.
+        backup_temporary.write_bytes(path.read_bytes())
+        backup_temporary.replace(backup)
 
     temporary.write_text(
         json.dumps(data, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
     temporary.replace(path)
+
+
+def recover(root):
+    """Restore a valid backup only when the current session is absent."""
+    current = session_file(root)
+    backup = backup_file(root)
+
+    if current.exists():
+        raise ValueError(
+            "A session already exists. Recovery will not overwrite it; "
+            "move the current session aside yourself if you need the backup."
+        )
+
+    data = load_path(backup)
+    if data is None:
+        raise ValueError("No recovery backup found.")
+
+    # Revalidate and write a new current session without touching the backup.
+    current.parent.mkdir(parents=True, exist_ok=True)
+    temporary = current.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(current)
+    return data
 
 
 def require_session(root):
@@ -247,6 +288,10 @@ def main(argv=None):
 
     commands.add_parser("resume", help="Show the saved session context")
     commands.add_parser(
+        "recover",
+        help="Restore a missing session from its last saved backup",
+    )
+    commands.add_parser(
         "status",
         help="Compare Git state with your checkpoint",
     )
@@ -276,6 +321,12 @@ def main(argv=None):
     try:
         if args.command == "doctor":
             return run_doctor(root)
+
+        if args.command == "recover":
+            data = recover(root)
+            print(f"Session recovered: {data['task']}")
+            print("Recovery backup was kept unchanged.")
+            return 0
 
         if args.command == "start":
             task = args.task.strip()
