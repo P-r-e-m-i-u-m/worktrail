@@ -51,6 +51,7 @@ jobs:
         env:
           TEST_RESULT: ${{ needs.test.result }}
         with:
+          github-token: ${{ secrets.WORKTRAIL_OWNER_TOKEN }}
           script: |
             const issue_number = 6;
             const result = process.env.TEST_RESULT;
