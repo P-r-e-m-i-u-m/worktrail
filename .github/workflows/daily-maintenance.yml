@@ -36,10 +36,31 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests -v
 
+  package:
+    name: Build and smoke-test distributions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build wheel and source distribution
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - name: Install built wheel and smoke-test CLI
+        shell: bash
+        run: |
+          python -m pip install --force-reinstall dist/*.whl
+          worktrail --version
+          worktrail --help
+
   report:
     name: Publish daily result
     if: always()
-    needs: [test]
+    needs: [test, package]
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -50,23 +71,27 @@ jobs:
         uses: actions/github-script@v7
         env:
           TEST_RESULT: ${{ needs.test.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
         with:
           github-token: ${{ secrets.WORKTRAIL_OWNER_TOKEN }}
           script: |
             const issue_number = 6;
-            const result = process.env.TEST_RESULT;
+            const testResult = process.env.TEST_RESULT;
+            const packageResult = process.env.PACKAGE_RESULT;
             const date = new Date().toISOString().slice(0, 10);
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const status = result === 'success' ? 'PASSED' : result === 'failure' ? 'FAILED' : result.toUpperCase();
+            const statusFor = result => result === 'success' ? 'PASSED' : result === 'failure' ? 'FAILED' : result.toUpperCase();
+            const overall = testResult === 'success' && packageResult === 'success' ? 'PASSED' : 'NEEDS ATTENTION';
             const body = [
               `### Daily check — ${date} (UTC)`,
               '',
-              `- **Result:** ${status}`,
-              '- **Coverage:** 4 Python versions (3.10–3.13) on Ubuntu and Windows',
-              '- **Checks:** package install, Python compile check, and the full unittest suite',
+              `- **Overall:** ${overall}`,
+              `- **Test matrix:** ${statusFor(testResult)} — Python 3.10–3.13 on Ubuntu and Windows`,
+              `- **Package build:** ${statusFor(packageResult)} — wheel, source distribution, and installed CLI smoke test`,
+              '- **Checks:** install, compile, unit tests, distribution build, and CLI startup',
               `- **Run:** [View actual logs](${runUrl})`,
               '',
-              '_Automated report from GitHub Actions; no code is changed or merged by this workflow._'
+              '_Automated report from GitHub Actions. Source code is not changed or merged by this workflow._'
             ].join('\n');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
