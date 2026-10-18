@@ -350,14 +350,14 @@ def main(argv=None):
                 print("Current session: missing")
 
             if previous is not None:
-                print("\\nPrevious saved version (session.json.bak)")
+                print("\nPrevious saved version (session.json.bak)")
                 print(f"  Task:       {previous['task']}")
                 print(f"  Checkpoint: {previous['checkpoint_at']}")
                 print(f"  Notes:      {len(previous['notes'])}")
             elif backup_path.exists():
-                print("\\nPrevious saved version: backup exists but is invalid")
+                print("\nPrevious saved version: backup exists but is invalid")
             else:
-                print("\\nPrevious saved version: no backup yet")
+                print("\nPrevious saved version: no backup yet")
             return 0
 
         if args.command == "start":
