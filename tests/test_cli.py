@@ -254,6 +254,91 @@ class WorktrailTests(unittest.TestCase):
         self.assertIn("Branch has changed", output)
         self.assertIn("Working tree has changed", output)
 
+    def test_status_lists_changed_files(self):
+        self.run_cli("start", "--task", "Fix login")
+        with patch(
+            "worktrail.cli.snapshot",
+            return_value={
+                "branch": "main",
+                "git_status": " M app.py\n?? new_file.py",
+            },
+        ):
+            code, output, _ = self.run_cli("status")
+
+        self.assertEqual(code, 0)
+        self.assertIn("Changed files:", output)
+        self.assertIn("  - app.py", output)
+        self.assertIn("  - new_file.py", output)
+
+    def test_status_lists_renamed_file_destination(self):
+        self.run_cli("start", "--task", "Fix login")
+        with patch(
+            "worktrail.cli.snapshot",
+            return_value={
+                "branch": "main",
+                "git_status": "R  old_name.py -> new_name.py",
+            },
+        ):
+            code, output, _ = self.run_cli("status")
+
+        self.assertEqual(code, 0)
+        self.assertIn("  - new_name.py", output)
+
+    def test_status_lists_renamed_file_with_arrow_in_name(self):
+        self.run_cli("start", "--task", "Fix login")
+        with patch(
+            "worktrail.cli.snapshot",
+            return_value={
+                "branch": "main",
+                "git_status": 'R  "old -> name.py" -> "new -> name.py"',
+            },
+        ):
+            code, output, _ = self.run_cli("status")
+
+        self.assertEqual(code, 0)
+        self.assertIn("  - new -> name.py", output)
+        self.assertNotIn("  - old -> name.py", output)
+
+    def test_status_decodes_quoted_changed_file_path(self):
+        self.run_cli("start", "--task", "Fix login")
+        with patch(
+            "worktrail.cli.snapshot",
+            return_value={
+                "branch": "main",
+                "git_status": r'?? "file with spaces.py"',
+            },
+        ):
+            code, output, _ = self.run_cli("status")
+
+        self.assertEqual(code, 0)
+        self.assertIn("  - file with spaces.py", output)
+
+    def test_status_decodes_octal_escaped_file_path(self):
+        self.run_cli("start", "--task", "Fix login")
+        with patch(
+            "worktrail.cli.snapshot",
+            return_value={
+                "branch": "main",
+                "git_status": r'?? "caf\303\251.py"',
+            },
+        ):
+            code, output, _ = self.run_cli("status")
+
+        self.assertEqual(code, 0)
+        self.assertIn("  - café.py", output)
+
+    def test_status_clean_tree_does_not_list_changed_files(self):
+        self.run_cli("start", "--task", "Fix login")
+
+        code, output, _ = self.run_cli("status")
+
+        self.assertEqual(code, 0)
+        self.assertIn(
+            "Working tree matches the last checkpoint.",
+            output,
+        )
+        self.assertNotIn("Changed files:", output)
+
     def test_unicode_notes_round_trip(self):
         self.run_cli("start", "--task", "Fix login")
         self.run_cli("checkpoint", "--note", "Café ☕")

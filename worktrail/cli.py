@@ -1,18 +1,91 @@
 """Local-first development session tracker."""
-
 import argparse
 import json
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-
 from . import __version__
 
 
 def timestamp():
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
+
+
+def _decode_git_path(path):
+    """Decode a path quoted by Git's short status output."""
+    if not (path.startswith('"') and path.endswith('"')):
+        return path
+
+    value = path[1:-1]
+    decoded = bytearray()
+    i = 0
+
+    escapes = {
+        '"': 34,
+        "\\": 92,
+        "a": 7,
+        "b": 8,
+        "t": 9,
+        "n": 10,
+        "v": 11,
+        "f": 12,
+        "r": 13,
+    }
+
+    while i < len(value):
+        if value[i] != "\\":
+            decoded.extend(value[i].encode("utf-8"))
+            i += 1
+            continue
+
+        i += 1
+        if i >= len(value):
+            decoded.append(92)
+            break
+
+        char = value[i]
+
+        if char in "01234567":
+            digits = char
+            i += 1
+
+            while (
+                i < len(value)
+                and len(digits) < 3
+                and value[i] in "01234567"
+            ):
+                digits += value[i]
+                i += 1
+
+            decoded.append(int(digits, 8))
+        else:
+            decoded.append(escapes.get(char, ord(char)))
+            i += 1
+
+    return decoded.decode("utf-8", errors="surrogateescape")
+
+
+def _split_rename_path(path):
+    """Split a rename entry at the separator outside quoted paths."""
+    quoted = False
+    escaped = False
+
+    for i, char in enumerate(path):
+        if quoted:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                quoted = False
+        elif char == '"':
+            quoted = True
+        elif path.startswith(" -> ", i):
+            return path[:i], path[i + 4:]
+
+    return None
 
 def snapshot(root):
     """Capture Git context without changing the repository."""
@@ -469,6 +542,32 @@ def main(argv=None):
 
             if tree_changed:
                 print("Working tree has changed since the last checkpoint.")
+
+                git_status = current.get("git_status") or ""
+                changed_paths = []
+
+                for line in git_status.splitlines():
+                    if len(line) < 4:
+                        continue
+
+                    status = line[:2]
+                    path = line[3:]
+
+                    if "R" in status or "C" in status:
+                        rename_paths = _split_rename_path(path)
+                        if rename_paths is not None:
+                            _, path = rename_paths
+
+                    path = _decode_git_path(path)
+
+                    if path:
+                        changed_paths.append(path)
+
+                if changed_paths:
+                    print("Changed files:")
+                    for path in changed_paths:
+                        print(f"  - {path}")
+
             else:
                 print("Working tree matches the last checkpoint.")
 
