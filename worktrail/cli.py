@@ -365,6 +365,10 @@ def main(argv=None):
         help="Show the current session and its previous saved version",
     )
     commands.add_parser(
+        "diff",
+        help="Compare the current session with its previous saved version",
+    )
+    commands.add_parser(
         "recover",
         help="Restore a missing session from its last saved backup",
     )
@@ -410,6 +414,48 @@ def main(argv=None):
             backup_path = backup_file(root)
             current = load_path(current_path)
             previous = load_path(backup_path)
+
+            if args.command == "diff":
+                if current is None or previous is None:
+                    raise ValueError(
+                        "Session comparison needs both a current session and a valid backup. "
+                        "Create another checkpoint first."
+                    )
+
+                previous_notes = {
+                    (note["at"], note["text"]) for note in previous["notes"]
+                }
+                current_notes = {
+                    (note["at"], note["text"]) for note in current["notes"]
+                }
+                added = [
+                    note for note in current["notes"]
+                    if (note["at"], note["text"]) not in previous_notes
+                ]
+                removed = [
+                    note for note in previous["notes"]
+                    if (note["at"], note["text"]) not in current_notes
+                ]
+                changed = False
+
+                if current["task"] != previous["task"]:
+                    print("Task changed:")
+                    print(f"  Previous: {previous['task']}")
+                    print(f"  Current:  {current['task']}")
+                    changed = True
+                if added:
+                    print("Notes added:")
+                    for note in added:
+                        print(f"  + [{note['at']}] {note['text']}")
+                    changed = True
+                if removed:
+                    print("Notes missing from current session:")
+                    for note in removed:
+                        print(f"  - [{note['at']}] {note['text']}")
+                    changed = True
+                if not changed:
+                    print("No task or note changes from the previous saved version.")
+                return 0
 
             if current is None and previous is None:
                 raise ValueError("No current session or recovery backup found.")
