@@ -168,6 +168,8 @@ class WorktrailTests(unittest.TestCase):
         self.assertEqual(code, 0, error)
         self.assertIn("Current session", output)
         self.assertIn("Previous saved version (session.json.bak)", output)
+        self.assertNotIn("\\nPrevious saved version", output)
+        self.assertIn("\nPrevious saved version", output)
         self.assertIn("Fix login", output)
         self.assertIn("Notes:      2", output)
         self.assertIn("Notes:      1", output)
@@ -179,6 +181,7 @@ class WorktrailTests(unittest.TestCase):
 
         self.assertEqual(code, 0, error)
         self.assertIn("no backup yet", output)
+        self.assertNotIn("\\nPrevious saved version", output)
 
     def test_history_fails_when_no_session_or_backup_exists(self):
         code, _, error = self.run_cli("history")
