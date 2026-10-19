@@ -86,6 +86,8 @@ python -m worktrail start --task "Build the settings page"
 | `worktrail checkpoint --note "..."` | Save a snapshot and a note |
 | `worktrail resume` | Read your saved context and notes |
 | `worktrail summary` | Show a compact overview of the current session |
+| `worktrail archive` | Archive and close the active session |
+| `worktrail search "query"` | Search tasks and notes across sessions |
 | `worktrail history` | Compare the current session with its previous saved version |
 | `worktrail status` | Compare current Git state with the last checkpoint |
 | `worktrail doctor` | Check setup and session-related conditions |
