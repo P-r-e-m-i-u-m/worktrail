@@ -158,6 +158,16 @@ class WorktrailTests(unittest.TestCase):
         self.assertIn("Cannot read session", error)
         self.assertFalse((folder / "session.json").exists())
 
+    def test_diff_reports_notes_added_since_checkpoint(self):
+        self.run_cli("start", "--task", "Fix login")
+        self.run_cli("checkpoint", "--note", "Initial state")
+        self.run_cli("checkpoint", "--note", "Token refresh still fails")
+
+        code, output, error = self.run_cli("diff")
+
+        self.assertEqual(code, 0, error)
+        self.assertIn("Notes added:", output)
+        self.assertIn("Token refresh still fails", output)
     def test_history_shows_current_and_previous_saved_session(self):
         self.run_cli("start", "--task", "Fix login")
         self.run_cli("checkpoint", "--note", "First saved note")
@@ -369,6 +379,75 @@ class WorktrailTests(unittest.TestCase):
         self.run_cli("checkpoint", "--note", "Café ☕")
         _, output, _ = self.run_cli("resume")
         self.assertIn("Café ☕", output)
+
+
+
+
+class ArchiveAndSearchFeatureTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp_dir.name)
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def run_cli(self, *args):
+        from unittest.mock import patch
+        from io import StringIO
+        from contextlib import redirect_stdout, redirect_stderr
+        from worktrail.cli import main
+
+        out, err = StringIO(), StringIO()
+        with patch("pathlib.Path.cwd", return_value=self.root):
+            with redirect_stdout(out), redirect_stderr(err):
+                code = main(list(args))
+        return code, out.getvalue(), err.getvalue()
+
+    def test_archive_saves_session_then_closes_it(self):
+        self.assertEqual(self.run_cli("start", "--task", "Fix authentication")[0], 0)
+        self.assertEqual(
+            self.run_cli("checkpoint", "--note", "Token refresh is broken")[0], 0
+        )
+        code, output, _ = self.run_cli("archive")
+        self.assertEqual(code, 0)
+        self.assertIn("Active session closed.", output)
+        self.assertFalse((self.root / ".worktrail" / "session.json").exists())
+        self.assertEqual(
+            len(list((self.root / ".worktrail" / "archive").glob("*.json"))), 1
+        )
+
+    def test_archive_requires_active_session(self):
+        code, _, error = self.run_cli("archive")
+        self.assertEqual(code, 1)
+        self.assertIn("No active session", error)
+
+    def test_search_finds_archived_task_and_note_case_insensitively(self):
+        self.assertEqual(self.run_cli("start", "--task", "Fix Authentication")[0], 0)
+        self.assertEqual(
+            self.run_cli("checkpoint", "--note", "Token refresh is broken")[0], 0
+        )
+        self.assertEqual(self.run_cli("archive")[0], 0)
+
+        code, output, _ = self.run_cli("search", "authentication")
+        self.assertEqual(code, 0)
+        self.assertIn("Fix Authentication", output)
+        self.assertIn("archive:", output)
+
+        code, output, _ = self.run_cli("search", "TOKEN REFRESH")
+        self.assertEqual(code, 0)
+        self.assertIn("Token refresh is broken", output)
+
+    def test_search_reports_no_matches(self):
+        self.assertEqual(self.run_cli("start", "--task", "Write documentation")[0], 0)
+        code, output, _ = self.run_cli("search", "nothing-like-this")
+        self.assertEqual(code, 0)
+        self.assertIn("No matches", output)
+
+    def test_search_rejects_blank_query(self):
+        code, _, error = self.run_cli("search", "   ")
+        self.assertEqual(code, 2)
+        self.assertIn("cannot be empty", error)
 
 
 if __name__ == "__main__":

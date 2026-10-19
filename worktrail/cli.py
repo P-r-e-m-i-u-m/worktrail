@@ -337,6 +337,100 @@ def write_handoff(path, content):
     with path.open("x", encoding="utf-8", newline="\n") as stream:
         stream.write(content)
 
+
+def archive_session(root):
+    """Save the active session to the archive, then close it."""
+    current = session_file(root)
+    data = load_path(current)
+    if data is None:
+        raise ValueError("No active session to archive. Run 'worktrail start' first.")
+
+    archive_dir = root / ".worktrail" / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    slug = "-".join(data["task"].lower().split())
+    slug = "".join(c for c in slug if c.isalnum() or c == "-")[:48].strip("-")
+    slug = slug or "session"
+    target = archive_dir / f"{stamp}-{slug}.json"
+    counter = 2
+    while target.exists():
+        target = archive_dir / f"{stamp}-{slug}-{counter}.json"
+        counter += 1
+
+    temporary = target.with_suffix(".tmp")
+    try:
+        temporary.write_text(
+            json.dumps(data, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        temporary.rename(target)
+        current.unlink()
+    except Exception:
+        if temporary.exists():
+            temporary.unlink()
+        raise
+
+    return target
+
+
+def search_sessions(root, query):
+    """Search tasks and notes in the current session, backup, and archives."""
+    query = query.strip()
+    if not query:
+        print("Search query cannot be empty.", file=sys.stderr)
+        return 2
+
+    worktrail_dir = root / ".worktrail"
+    sources = [
+        ("current session", session_file(root)),
+        ("previous backup", backup_file(root)),
+    ]
+    archive_dir = worktrail_dir / "archive"
+    if archive_dir.is_dir():
+        sources.extend(
+            (f"archive: {path.name}", path)
+            for path in sorted(archive_dir.glob("*.json"))
+        )
+
+    needle = query.casefold()
+    count = 0
+    for label, path in sources:
+        if not path.is_file():
+            continue
+        try:
+            data = load_path(path)
+        except (ValueError, OSError) as exc:
+            if label.startswith("archive:"):
+                print(f"Warning: skipped {label}: {exc}", file=sys.stderr)
+                continue
+            raise
+        if data is None:
+            continue
+
+        task_hit = needle in data["task"].casefold()
+        note_hits = [
+            note for note in data["notes"]
+            if needle in note["text"].casefold()
+        ]
+        if not task_hit and not note_hits:
+            continue
+
+        count += 1
+        print(f"Session: {label}")
+        print(f"Task: {data['task']}")
+        print(f"Started: {data['started_at']}")
+        if task_hit:
+            print("Match: task")
+        for note in note_hits:
+            print(f"Match: note [{note['at']}]: {note['text']}")
+        print()
+
+    if not count:
+        print(f"No matches for '{query}'.")
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="worktrail",
@@ -361,6 +455,9 @@ def main(argv=None):
 
     commands.add_parser("resume", help="Show the saved session context")
     commands.add_parser("summary", help="Show a compact session overview")
+    commands.add_parser("archive", help="Archive and close the active session")
+    search = commands.add_parser("search", help="Search tasks and notes across sessions")
+    search.add_argument("query", help="Text to search in tasks and notes")
     commands.add_parser(
         "history",
         help="Show the current session and its previous saved version",
@@ -401,6 +498,15 @@ def main(argv=None):
     root = Path.cwd()
 
     try:
+        if args.command == "archive":
+            archived = archive_session(root)
+            print(f"Session archived: {archived.name}")
+            print("Active session closed.")
+            return 0
+
+        if args.command == "search":
+            return search_sessions(root, args.query)
+
         if args.command == "doctor":
             return run_doctor(root)
 
@@ -410,7 +516,7 @@ def main(argv=None):
             print("Recovery backup was kept unchanged.")
             return 0
 
-        if args.command == "history":
+        if args.command in ("history", "diff"):
             current_path = session_file(root)
             backup_path = backup_file(root)
             current = load_path(current_path)
