@@ -189,6 +189,28 @@ class WorktrailTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("No current session or recovery backup found", error)
 
+    def test_summary_shows_compact_session_overview(self):
+        self.run_cli("start", "--task", "Fix login")
+        self.run_cli("checkpoint", "--note", "First note")
+        self.run_cli("checkpoint", "--note", "Latest note")
+        code, output, error = self.run_cli("summary")
+        self.assertEqual(code, 0, error)
+        self.assertIn("Task:       Fix login", output)
+        self.assertIn("Notes:      2", output)
+        self.assertIn("Latest note: Latest note", output)
+        self.assertIn("Branch:     main", output)
+
+    def test_summary_reports_no_notes(self):
+        self.run_cli("start", "--task", "Fix login")
+        code, output, error = self.run_cli("summary")
+        self.assertEqual(code, 0, error)
+        self.assertIn("Notes:      0", output)
+        self.assertIn("Latest note: none yet", output)
+
+    def test_summary_requires_session(self):
+        code, _, error = self.run_cli("summary")
+        self.assertEqual(code, 1)
+        self.assertIn("No session found", error)
     def test_version(self):
         out = io.StringIO()
         with contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as exit_info:

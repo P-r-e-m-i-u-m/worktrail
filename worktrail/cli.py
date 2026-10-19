@@ -360,6 +360,7 @@ def main(argv=None):
     checkpoint.add_argument("--note", help="Leave a note for future-you")
 
     commands.add_parser("resume", help="Show the saved session context")
+    commands.add_parser("summary", help="Show a compact session overview")
     commands.add_parser(
         "history",
         help="Show the current session and its previous saved version",
@@ -549,6 +550,18 @@ def main(argv=None):
                 print(f"Handoff saved: {args.output}")
             else:
                 print(content, end="")
+            return 0
+
+        if args.command == "summary":
+            print("Task:       {}".format(data["task"]))
+            print("Started:    {}".format(data["started_at"]))
+            print("Checkpoint: {}".format(data["checkpoint_at"]))
+            print("Notes:      {}".format(len(data["notes"])))
+            print("Branch:     {}".format(data.get("branch") or "unavailable"))
+            if data["notes"]:
+                print("Latest note: {}".format(data["notes"][-1]["text"]))
+            else:
+                print("Latest note: none yet")
             return 0
 
         if args.command == "resume":
