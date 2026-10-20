@@ -68,6 +68,39 @@ class WorktrailTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("Next step cannot be empty", error)
 
+    def test_doctor_distinguishes_missing_git_executable(self):
+        with patch("worktrail.cli.shutil.which", return_value=None):
+            with patch("worktrail.cli.subprocess.run") as run:
+                code, output, error = self.run_cli("doctor")
+
+        self.assertEqual(code, 1, error)
+        self.assertIn("Git was not found on PATH", output)
+        self.assertIn("Install Git", output)
+        self.assertNotIn("Not inside a Git repository", output)
+        self.assertIn(
+            "Cannot check ignore rules because Git is not available on PATH",
+            output,
+        )
+        run.assert_not_called()
+
+    def test_doctor_warns_when_git_is_installed_outside_repository(self):
+        from unittest.mock import Mock
+
+        with patch("worktrail.cli.shutil.which", return_value="/usr/bin/git"):
+            with patch(
+                "worktrail.cli.snapshot",
+                return_value={"branch": None, "git_status": None},
+            ):
+                with patch(
+                    "worktrail.cli.subprocess.run",
+                    return_value=Mock(returncode=1, stdout="", stderr=""),
+                ):
+                    code, output, error = self.run_cli("doctor")
+
+        self.assertEqual(code, 1, error)
+        self.assertIn("[WARN] Git repository: Not inside a Git repository", output)
+        self.assertNotIn("Git was not found on PATH", output)
+
     def test_doctor_passes_when_git_ignores_session_file(self):
         from unittest.mock import Mock
 
