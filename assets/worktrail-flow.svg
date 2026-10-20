@@ -1,48 +1,63 @@
-﻿<svg xmlns="http://www.w3.org/2000/svg" width="920" height="250" viewBox="0 0 920 250" fill="none" role="img" aria-labelledby="title desc">
-  <title id="title">Worktrail workflow</title>
-  <desc id="desc">A four-step path from working, to saving a checkpoint, to closing the laptop, to resuming with context.</desc>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="340" viewBox="0 0 960 340" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Worktrail keeps the thread of your work</title>
+  <desc id="desc">A terminal session shows a task being worked on, a checkpoint note being saved, and the next step ready for the next session.</desc>
   <defs>
-    <linearGradient id="panel" x1="0" y1="0" x2="920" y2="250" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#171D2A"/>
-      <stop offset="1" stop-color="#10151F"/>
+    <linearGradient id="paper" x1="0" y1="0" x2="960" y2="340" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#171916"/>
+      <stop offset="1" stop-color="#20221C"/>
     </linearGradient>
-    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
-      <stop stop-color="#9DABFF"/>
-      <stop offset="1" stop-color="#69E0C1"/>
+    <linearGradient id="terminal" x1="44" y1="90" x2="612" y2="292" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111410"/>
+      <stop offset="1" stop-color="#171B15"/>
     </linearGradient>
+    <linearGradient id="marker" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#D8F078"/>
+      <stop offset="1" stop-color="#A8C95B"/>
+    </linearGradient>
+    <pattern id="grain" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r=".6" fill="#E7E8D8" opacity=".08"/>
+    </pattern>
   </defs>
-  <rect x="1" y="1" width="918" height="248" rx="20" fill="url(#panel)" stroke="#30394A"/>
-  <text x="34" y="38" fill="#9AA8BE" font-family="Segoe UI,Arial,sans-serif" font-size="11" letter-spacing="2.2">A BETTER WAY TO STOP AND START AGAIN</text>
-  <path d="M204 123H252M432 123H480M660 123H708" stroke="#536078" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 6"/>
-  <path d="M245 117L252 123L245 129M473 117L480 123L473 129M701 117L708 123L701 129" stroke="#8190AA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <rect x="1" y="1" width="958" height="338" rx="16" fill="url(#paper)" stroke="#45483B"/>
+  <rect x="1" y="1" width="958" height="338" rx="16" fill="url(#grain)"/>
+
+  <text x="34" y="38" fill="#D8F078" font-family="Consolas, 'Liberation Mono', monospace" font-size="10" letter-spacing="2.1">WORKTRAIL / FIELD NOTES 001</text>
+  <text x="34" y="66" fill="#F0F0E7" font-family="Segoe UI, Arial, sans-serif" font-size="22" font-weight="600">Good work leaves a trail.</text>
+  <text x="34" y="84" fill="#A6AA9A" font-family="Segoe UI, Arial, sans-serif" font-size="11">Not another task board. A thread back into the work.</text>
+
   <g>
-    <rect x="28" y="69" width="176" height="108" rx="13" fill="#202A3A" stroke="#3B4960"/>
-    <circle cx="52" cy="93" r="11" fill="#303E56"/>
-    <path d="M47 93H57M52 88V98" stroke="#C3CEFF" stroke-width="1.7" stroke-linecap="round"/>
-    <text x="44" y="127" fill="#F0F3FA" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="600">Work</text>
-    <text x="44" y="149" fill="#A9B5C9" font-family="Segoe UI,Arial,sans-serif" font-size="11">Build, debug, explore</text>
+    <rect x="28" y="105" width="574" height="201" rx="9" fill="url(#terminal)" stroke="#41463A"/>
+    <path d="M28 138H602" stroke="#41463A"/>
+    <circle cx="46" cy="122" r="3" fill="#D16F57"/>
+    <circle cx="58" cy="122" r="3" fill="#D8B35B"/>
+    <circle cx="70" cy="122" r="3" fill="#9EBE61"/>
+    <text x="88" y="126" fill="#8F9683" font-family="Consolas, 'Liberation Mono', monospace" font-size="10">~/work/project</text>
+    <text x="48" y="161" fill="#D8F078" font-family="Consolas, 'Liberation Mono', monospace" font-size="11">$ worktrail start --task "Fix login flow"</text>
+    <text x="48" y="184" fill="#8E9684" font-family="Consolas, 'Liberation Mono', monospace" font-size="10">task: Fix login flow  ·  saved locally</text>
+    <text x="48" y="211" fill="#D8F078" font-family="Consolas, 'Liberation Mono', monospace" font-size="11">$ worktrail checkpoint --note</text>
+    <text x="62" y="229" fill="#D8F078" font-family="Consolas, 'Liberation Mono', monospace" font-size="11">"Expired tokens still need tests"</text>
+    <rect x="48" y="247" width="528" height="38" rx="5" fill="#23291D" stroke="#47533A"/>
+    <path d="M62 266l4 4 8-9" stroke="#D8F078" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="84" y="264" fill="#E7E9DB" font-family="Consolas, 'Liberation Mono', monospace" font-size="10">checkpoint saved</text>
+    <text x="84" y="277" fill="#9BA58B" font-family="Consolas, 'Liberation Mono', monospace" font-size="9">.worktrail/session.json</text>
   </g>
+
+  <path d="M623 204H654" stroke="#777E68" stroke-width="1.3" stroke-linecap="round"/>
+  <path d="M648 198L654 204L648 210" stroke="#777E68" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+
   <g>
-    <rect x="256" y="69" width="176" height="108" rx="13" fill="#202A3A" stroke="#3B4960"/>
-    <circle cx="280" cy="93" r="11" fill="#303E56"/>
-    <path d="M275 88H285V98H275Z M278 91H282M278 94H282" stroke="#C3CEFF" stroke-width="1.4" stroke-linejoin="round"/>
-    <text x="272" y="127" fill="#F0F3FA" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="600">Checkpoint</text>
-    <text x="272" y="149" fill="#A9B5C9" font-family="Segoe UI,Arial,sans-serif" font-size="11">Save the useful details</text>
+    <rect x="668" y="105" width="264" height="201" rx="9" fill="#292B22" stroke="#555A45"/>
+    <text x="688" y="130" fill="#A6AA9A" font-family="Consolas, 'Liberation Mono', monospace" font-size="10" letter-spacing="1.2">NEXT TIME</text>
+    <path d="M688 144H912" stroke="#4B4F3F"/>
+    <circle cx="697" cy="169" r="5" fill="url(#marker)"/>
+    <text x="711" y="173" fill="#E9EADF" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="600">Pick up the thread</text>
+    <text x="688" y="202" fill="#AEB3A1" font-family="Segoe UI, Arial, sans-serif" font-size="11">Task</text>
+    <text x="688" y="218" fill="#F0F0E7" font-family="Segoe UI, Arial, sans-serif" font-size="12">Fix login flow</text>
+    <text x="688" y="244" fill="#AEB3A1" font-family="Segoe UI, Arial, sans-serif" font-size="11">Last note</text>
+    <text x="688" y="260" fill="#F0F0E7" font-family="Segoe UI, Arial, sans-serif" font-size="11">Expired tokens still</text>
+    <text x="688" y="275" fill="#F0F0E7" font-family="Segoe UI, Arial, sans-serif" font-size="11">need tests.</text>
+    <text x="688" y="292" fill="#D8F078" font-family="Consolas, 'Liberation Mono', monospace" font-size="9">YOUR MACHINE. YOUR CONTEXT.</text>
   </g>
-  <g>
-    <rect x="484" y="69" width="176" height="108" rx="13" fill="#202A3A" stroke="#3B4960"/>
-    <circle cx="508" cy="93" r="11" fill="#303E56"/>
-    <path d="M501 91H515V98H501Z M503 88H513V91" stroke="#C3CEFF" stroke-width="1.4" stroke-linejoin="round"/>
-    <text x="500" y="127" fill="#F0F3FA" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="600">Step away</text>
-    <text x="500" y="149" fill="#A9B5C9" font-family="Segoe UI,Arial,sans-serif" font-size="11">Close the laptop</text>
-  </g>
-  <g>
-    <rect x="712" y="69" width="180" height="108" rx="13" fill="#202A3A" stroke="#6478A3"/>
-    <rect x="728" y="82" width="22" height="22" rx="11" fill="#263F48"/>
-    <path d="M734 93L738 97L745 89" stroke="url(#accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="728" y="127" fill="#F0F3FA" font-family="Segoe UI,Arial,sans-serif" font-size="16" font-weight="600">Resume</text>
-    <text x="728" y="149" fill="#A9B5C9" font-family="Segoe UI,Arial,sans-serif" font-size="11">Pick up the thread</text>
-  </g>
-  <text x="34" y="218" fill="#77869F" font-family="Consolas,monospace" font-size="11">.worktrail/session.json</text>
-  <text x="886" y="218" text-anchor="end" fill="#8190AA" font-family="Segoe UI,Arial,sans-serif" font-size="11">Your project. Your context.</text>
 </svg>
