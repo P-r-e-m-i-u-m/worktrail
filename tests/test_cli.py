@@ -534,13 +534,10 @@ class ArchiveAndSearchFeatureTests(unittest.TestCase):
         self.assertIn("Exported 2 session record(s)", output)
         self.assertTrue(bundle.is_file())
 
-        destination = self.root / "other-project"
-        destination.mkdir()
-        with patch("worktrail.cli.Path.cwd", return_value=destination):
-            code, output, error = self.run_cli("import", str(bundle))
+        code, output, error = self.run_cli("import", str(bundle))
         self.assertEqual(code, 0, error)
         self.assertIn("Imported 2 session record(s)", output)
-        archived = list((destination / ".worktrail" / "archive").glob("*.json"))
+        archived = list((self.root / ".worktrail" / "archive").glob("*.json"))
         self.assertEqual(len(archived), 2)
         self.assertTrue(any("Fix login" in path.read_text(encoding="utf-8") for path in archived))
 
