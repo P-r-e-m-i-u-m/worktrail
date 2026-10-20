@@ -95,6 +95,7 @@ python -m worktrail start --task "Build the settings page"
 | `worktrail history` | Compare the current session with its previous saved version |
 | `worktrail status` | Compare current Git state with the last checkpoint |
 | `worktrail doctor` | Check setup and session-related conditions |
+| `worktrail doctor --json` | Print structured JSON diagnostics for scripts and editor integrations |
 
 An existing session isn't silently overwritten. Resume it before starting another one.
 

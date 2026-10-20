@@ -212,7 +212,7 @@ def require_session(root):
     return data
 
 
-def run_doctor(root):
+def run_doctor(root, json_output=False):
     """Check common Worktrail setup issues without changing files."""
     checks = []
 
@@ -303,9 +303,19 @@ def run_doctor(root):
         except (OSError, subprocess.TimeoutExpired) as exc:
             checks.append((".worktrail ignored", False, str(exc)))
     
-    for name, passed, message in checks:
-        marker = "OK" if passed else "WARN"
-        print(f"[{marker}] {name}: {message}")
+    if json_output:
+        report = {
+            "ok": all(passed for _, passed, _ in checks),
+            "checks": [
+                {"name": name, "ok": passed, "message": message}
+                for name, passed, message in checks
+            ],
+        }
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+    else:
+        for name, passed, message in checks:
+            marker = "OK" if passed else "WARN"
+            print(f"[{marker}] {name}: {message}")
 
     return 0 if all(passed for _, passed, _ in checks) else 1
 
@@ -620,10 +630,11 @@ def main(argv=None):
         "status",
         help="Compare Git state with your checkpoint",
     )
-    commands.add_parser(
+    doctor = commands.add_parser(
         "doctor",
         help="Check this project's Worktrail setup",
     )
+    doctor.add_argument("--json", action="store_true", help="Print machine-readable JSON diagnostics")
 
     handoff = commands.add_parser(
         "handoff",
@@ -674,7 +685,7 @@ def main(argv=None):
             return search_sessions(root, args.query)
 
         if args.command == "doctor":
-            return run_doctor(root)
+            return run_doctor(root, json_output=args.json)
 
         if args.command == "recover":
             data = recover(root)
