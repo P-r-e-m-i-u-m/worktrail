@@ -1,6 +1,7 @@
 """Local-first development session tracker."""
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -213,18 +214,36 @@ def run_doctor(root):
     """Check common Worktrail setup issues without changing files."""
     checks = []
 
-    git = snapshot(root)
-    git_available = git["branch"] is not None
+    git_executable = shutil.which("git")
 
-    checks.append(
-        (
-            "Git repository",
-            git_available,
-            "Git context available"
-            if git_available
-            else "Not inside a Git repository",
+    if git_executable is None:
+        checks.append(
+            (
+                "Git repository",
+                False,
+                "Git was not found on PATH. Install Git and ensure it is available on PATH.",
+            )
         )
-    )
+        checks.append(
+            (
+                ".worktrail ignored",
+                False,
+                "Cannot check ignore rules because Git is not available on PATH",
+            )
+        )
+    else:
+        git = snapshot(root)
+        git_available = git["branch"] is not None
+
+        checks.append(
+            (
+                "Git repository",
+                git_available,
+                "Git context available"
+                if git_available
+                else "Not inside a Git repository",
+            )
+        )
 
     try:
         data = load(root)
@@ -245,42 +264,43 @@ def run_doctor(root):
     except (ValueError, OSError) as exc:
         checks.append(("Session", False, str(exc)))
 
-    try:
-        proc = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(root),
-                "check-ignore",
-                "--quiet",
-                "--",
-                ".worktrail/session.json",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-
-        if proc.returncode == 0:
-            ignored = True
-            message = "Git rules ignore .worktrail/session.json"
-        elif proc.returncode == 1:
-            ignored = False
-            message = (
-                "Git does not ignore .worktrail/session.json; "
-                "add .worktrail/ to an applicable ignore file"
+    if git_executable is not None:
+        try:
+            proc = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "check-ignore",
+                    "--quiet",
+                    "--",
+                    ".worktrail/session.json",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
             )
-        else:
-            ignored = False
-            detail = proc.stderr.strip() or "Git could not evaluate ignore rules"
-            message = detail
-
-        checks.append((".worktrail ignored", ignored, message))
-
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        checks.append((".worktrail ignored", False, str(exc)))
-
+    
+            if proc.returncode == 0:
+                ignored = True
+                message = "Git rules ignore .worktrail/session.json"
+            elif proc.returncode == 1:
+                ignored = False
+                message = (
+                    "Git does not ignore .worktrail/session.json; "
+                    "add .worktrail/ to an applicable ignore file"
+                )
+            else:
+                ignored = False
+                detail = proc.stderr.strip() or "Git could not evaluate ignore rules"
+                message = detail
+    
+            checks.append((".worktrail ignored", ignored, message))
+    
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            checks.append((".worktrail ignored", False, str(exc)))
+    
     for name, passed, message in checks:
         marker = "OK" if passed else "WARN"
         print(f"[{marker}] {name}: {message}")
