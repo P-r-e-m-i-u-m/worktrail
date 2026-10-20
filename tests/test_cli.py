@@ -559,5 +559,53 @@ class ArchiveAndSearchFeatureTests(unittest.TestCase):
         self.assertFalse((self.root / ".worktrail" / "archive").exists())
 
 
+    def test_doctor_json_emits_structured_success_report(self):
+        import json
+        from unittest.mock import Mock
+
+        with patch(
+            "worktrail.cli.subprocess.run",
+            return_value=Mock(returncode=0, stdout="", stderr=""),
+        ):
+            code, output, error = self.run_cli("doctor", "--json")
+
+        self.assertEqual(code, 0, error)
+        report = json.loads(output)
+        self.assertTrue(report["ok"])
+        self.assertEqual(
+            {item["name"] for item in report["checks"]},
+            {"Git repository", "Session", ".worktrail ignored"},
+        )
+        for item in report["checks"]:
+            self.assertEqual(set(item), {"name", "ok", "message"})
+            self.assertIsInstance(item["ok"], bool)
+            self.assertIsInstance(item["message"], str)
+        self.assertNotIn("[OK]", output)
+
+    def test_doctor_json_preserves_failure_exit_code(self):
+        import json
+
+        with patch("worktrail.cli.shutil.which", return_value=None):
+            code, output, error = self.run_cli("doctor", "--json")
+
+        self.assertEqual(code, 1, error)
+        report = json.loads(output)
+        self.assertFalse(report["ok"])
+        self.assertTrue(any(not item["ok"] for item in report["checks"]))
+
+    def test_doctor_default_output_remains_human_readable(self):
+        from unittest.mock import Mock
+
+        with patch(
+            "worktrail.cli.subprocess.run",
+            return_value=Mock(returncode=0, stdout="", stderr=""),
+        ):
+            code, output, error = self.run_cli("doctor")
+
+        self.assertEqual(code, 0, error)
+        self.assertIn("[OK] Git repository:", output)
+        self.assertNotIn('"checks"', output)
+
+
 if __name__ == "__main__":
     unittest.main()
