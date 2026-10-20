@@ -629,6 +629,12 @@ def main(argv=None):
         "handoff",
         help="Prepare a Markdown handoff for your next coding session",
     )
+    context = commands.add_parser(
+        "context",
+        help="Print a coding-agent-ready brief for the current work",
+    )
+    context.add_argument("--next", dest="next_step", help="Record the next step")
+    context.add_argument("--output", type=Path, help="Save the brief to a new file")
     handoff.add_argument(
         "--next",
         dest="next_step",
@@ -800,7 +806,7 @@ def main(argv=None):
 
         data = require_session(root)
 
-        if args.command == "handoff":
+        if args.command in ("handoff", "context"):
             next_step = args.next_step
             if next_step is not None and not next_step.strip():
                 raise ValueError("Next step cannot be empty.")
