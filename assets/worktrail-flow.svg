@@ -35,7 +35,7 @@
     <circle cx="70" cy="122" r="3" fill="#9EBE61"/>
     <text x="88" y="126" fill="#8F9683" font-family="Consolas, 'Liberation Mono', monospace" font-size="10">~/work/project</text>
     <text x="48" y="161" fill="#D8F078" font-family="Consolas, 'Liberation Mono', monospace" font-size="11">$ worktrail start --task "Fix login flow"</text>
-    <text x="48" y="184" fill="#8E9684" font-family="Consolas, 'Liberation Mono', monospace" font-size="10">SESSION STARTED  ·  local context only</text>
+    <text x="48" y="184" fill="#8E9684" font-family="Consolas, 'Liberation Mono', monospace" font-size="10">task: Fix login flow  ·  saved locally</text>
     <text x="48" y="211" fill="#D8F078" font-family="Consolas, 'Liberation Mono', monospace" font-size="11">$ worktrail checkpoint --note</text>
     <text x="62" y="229" fill="#D8F078" font-family="Consolas, 'Liberation Mono', monospace" font-size="11">"Expired tokens still need tests"</text>
     <rect x="48" y="247" width="528" height="38" rx="5" fill="#23291D" stroke="#47533A"/>
