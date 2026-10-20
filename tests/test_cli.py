@@ -180,6 +180,22 @@ class WorktrailTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("No recovery backup found", error)
 
+    def test_commands_fail_cleanly_when_session_is_not_utf8(self):
+        folder = self.root / ".worktrail"
+        folder.mkdir()
+        session = folder / "session.json"
+        session.write_bytes(b"\xff\xfe{\"task\": \"\xffencoding\"}")
+
+        code, _, error = self.run_cli("summary")
+
+        self.assertEqual(code, 1)
+        self.assertIn("not valid UTF-8", error)
+        self.assertNotIn("Traceback", error)
+        # the file is left untouched
+        self.assertEqual(
+            session.read_bytes(), b"\xff\xfe{\"task\": \"\xffencoding\"}"
+        )
+
     def test_recover_rejects_malformed_backup_without_creating_session(self):
         folder = self.root / ".worktrail"
         folder.mkdir()

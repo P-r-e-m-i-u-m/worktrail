@@ -123,6 +123,8 @@ def load_path(path):
 
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"Session file is not valid UTF-8: {exc}") from exc
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Cannot read session: {exc}") from exc
 
