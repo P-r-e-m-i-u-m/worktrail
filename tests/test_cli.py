@@ -499,5 +499,68 @@ class ArchiveAndSearchFeatureTests(unittest.TestCase):
         self.assertIn("cannot be empty", error)
 
 
+    def test_context_command_prints_agent_ready_handoff(self):
+        self.assertEqual(self.run_cli("start", "--task", "Fix login")[0], 0)
+        self.assertEqual(
+            self.run_cli("checkpoint", "--note", "Refresh token expires")[0], 0
+        )
+        code, output, error = self.run_cli(
+            "context", "--next", "Add expired-token tests"
+        )
+        self.assertEqual(code, 0, error)
+        self.assertIn("# Work handoff: Fix login", output)
+        self.assertIn("Refresh token expires", output)
+        self.assertIn("Add expired-token tests", output)
+
+    def test_timeline_includes_current_and_archived_sessions(self):
+        self.assertEqual(self.run_cli("start", "--task", "Fix login")[0], 0)
+        self.assertEqual(self.run_cli("archive")[0], 0)
+        self.assertEqual(self.run_cli("start", "--task", "Write docs")[0], 0)
+        code, output, error = self.run_cli("timeline")
+        self.assertEqual(code, 0, error)
+        self.assertIn("Fix login", output)
+        self.assertIn("Write docs", output)
+        self.assertIn("archive:", output)
+        self.assertIn("current", output)
+
+    def test_export_and_import_round_trip_without_overwriting(self):
+        self.assertEqual(self.run_cli("start", "--task", "Fix login")[0], 0)
+        self.assertEqual(
+            self.run_cli("checkpoint", "--note", "Add token tests")[0], 0
+        )
+        bundle = self.root / "worktrail-export.json"
+        code, output, error = self.run_cli("export", str(bundle))
+        self.assertEqual(code, 0, error)
+        self.assertIn("Exported 2 session record(s)", output)
+        self.assertTrue(bundle.is_file())
+
+        destination = self.root / "other-project"
+        destination.mkdir()
+        with patch("pathlib.Path.cwd", return_value=destination):
+            code, output, error = self.run_cli("import", str(bundle))
+        self.assertEqual(code, 0, error)
+        self.assertIn("Imported 2 session record(s)", output)
+        archived = list((destination / ".worktrail" / "archive").glob("*.json"))
+        self.assertEqual(len(archived), 2)
+        self.assertTrue(any("Fix login" in path.read_text(encoding="utf-8") for path in archived))
+
+    def test_export_refuses_to_overwrite_existing_file(self):
+        self.assertEqual(self.run_cli("start", "--task", "Fix login")[0], 0)
+        target = self.root / "existing.json"
+        target.write_text("keep me", encoding="utf-8")
+        code, _, error = self.run_cli("export", str(target))
+        self.assertEqual(code, 1)
+        self.assertIn("File exists", error)
+        self.assertEqual(target.read_text(encoding="utf-8"), "keep me")
+
+    def test_import_rejects_unknown_format_without_writing_archive(self):
+        source = self.root / "bad.json"
+        source.write_text('{"format":"other","version":1,"sessions":[]}', encoding="utf-8")
+        code, _, error = self.run_cli("import", str(source))
+        self.assertEqual(code, 1)
+        self.assertIn("Unsupported Worktrail export format", error)
+        self.assertFalse((self.root / ".worktrail" / "archive").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
