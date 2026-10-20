@@ -6,7 +6,7 @@
 
 A small local-first CLI that remembers what you were working on, what changed, and what to do next.
 
-[Getting started](#getting-started) · [Commands](#commands) · [How it works](#how-it-works)
+[Getting started](#getting-started) · [Commands](#commands) · [Portable memory](#portable-memory) · [How it works](#how-it-works)
 
 ![Worktrail workflow](assets/worktrail-flow.svg)
 
@@ -88,11 +88,35 @@ python -m worktrail start --task "Build the settings page"
 | `worktrail summary` | Show a compact overview of the current session |
 | `worktrail archive` | Archive and close the active session |
 | `worktrail search "query"` | Search tasks and notes across sessions |
+| `worktrail context --next "..."` | Print a coding-agent-ready handoff brief |
+| `worktrail timeline` | Read current, backup, and archived sessions chronologically |
+| `worktrail export memory.json` | Export session records to a portable JSON bundle |
+| `worktrail import memory.json` | Import a bundle into the archive without replacing files |
 | `worktrail history` | Compare the current session with its previous saved version |
 | `worktrail status` | Compare current Git state with the last checkpoint |
 | `worktrail doctor` | Check setup and session-related conditions |
 
 An existing session isn't silently overwritten. Resume it before starting another one.
+
+## Portable memory
+
+Worktrail can carry project context beyond one terminal session or machine:
+
+```powershell
+# Prepare a brief for your next coding-agent session
+worktrail context --next "Add tests for expired tokens"
+
+# See how saved work evolved
+worktrail timeline
+
+# Move your session history to another machine or project
+worktrail export worktrail-memory.json
+worktrail import worktrail-memory.json
+```
+
+`context` produces a Markdown handoff using your task, notes, and current Git state. It does not call an AI service; paste the brief into the tool you're using. `timeline` combines the current session, its previous saved version, and archived sessions. Export bundles are versioned JSON and import writes validated sessions into the archive, leaving the active session and existing archive entries alone.
+
+Exports can contain project names, branch names, working-tree paths, and your notes. Review the file before sharing it. Keep exports somewhere safe if they contain private project context.
 
 ## How it works
 

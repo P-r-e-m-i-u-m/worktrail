@@ -453,6 +453,125 @@ def search_sessions(root, query):
     return 0
 
 
+
+def session_records(root):
+    """Collect validated sessions from current state, backup, and archive."""
+    worktrail_dir = root / ".worktrail"
+    candidates = [
+        ("current", session_file(root)),
+        ("backup", backup_file(root)),
+    ]
+    archive_dir = worktrail_dir / "archive"
+    if archive_dir.is_dir():
+        candidates.extend(
+            (f"archive:{path.name}", path)
+            for path in sorted(archive_dir.glob("*.json"))
+        )
+
+    records = []
+    for source, path in candidates:
+        if not path.is_file():
+            continue
+        data = load_path(path)
+        if data is not None:
+            records.append({"source": source, "session": data})
+    return records
+
+
+def render_timeline(root):
+    """Render a chronological, read-only view of known session records."""
+    records = session_records(root)
+    records.sort(
+        key=lambda record: record["session"].get("checkpoint_at", ""),
+    )
+    if not records:
+        return "No session history found.\n"
+
+    lines = ["# Worktrail timeline", ""]
+    for record in records:
+        data = record["session"]
+        lines.extend([
+            f"## {data['checkpoint_at']} — {data['task']}",
+            f"- Source: {record['source']}",
+            f"- Started: {data['started_at']}",
+            f"- Notes: {len(data['notes'])}",
+        ])
+        for note in data["notes"]:
+            lines.append(f"  - [{note['at']}] {note['text']}")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def export_sessions(root, destination):
+    """Export validated session records to a portable JSON bundle."""
+    if destination.exists():
+        raise ValueError(f"File exists: {destination}")
+    bundle = {
+        "format": "worktrail-session-bundle",
+        "version": 1,
+        "exported_at": timestamp(),
+        "sessions": session_records(root),
+    }
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open("x", encoding="utf-8", newline="\n") as stream:
+        json.dump(bundle, stream, indent=2, ensure_ascii=False)
+        stream.write("\n")
+    return len(bundle["sessions"])
+
+
+def import_sessions(root, source):
+    """Import a Worktrail bundle into archive without replacing existing files."""
+    try:
+        bundle = json.loads(source.read_text(encoding="utf-8"))
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"Import file is not valid UTF-8: {exc}") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read import file: {exc}") from exc
+
+    if (
+        not isinstance(bundle, dict)
+        or bundle.get("format") != "worktrail-session-bundle"
+        or bundle.get("version") != 1
+        or not isinstance(bundle.get("sessions"), list)
+    ):
+        raise ValueError("Unsupported Worktrail export format.")
+
+    validated = []
+    for record in bundle["sessions"]:
+        if not isinstance(record, dict) or not isinstance(record.get("session"), dict):
+            raise ValueError("Import bundle contains an invalid session record.")
+        # Reuse the same schema validator as local session files.
+        import tempfile
+        with tempfile.TemporaryDirectory() as temporary_dir:
+            candidate = Path(temporary_dir) / "session.json"
+            candidate.write_text(
+                json.dumps(record["session"], ensure_ascii=False),
+                encoding="utf-8",
+            )
+            data = load_path(candidate)
+        if data is None:
+            raise ValueError("Import bundle contains an empty session record.")
+        validated.append(data)
+
+    archive_dir = root / ".worktrail" / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    imported = 0
+    for data in validated:
+        stamp = "".join(c for c in data["checkpoint_at"] if c.isalnum())[:20]
+        slug = "-".join(data["task"].lower().split())
+        slug = "".join(c for c in slug if c.isalnum() or c == "-")[:48].strip("-")
+        target = archive_dir / f"import-{stamp}-{slug or 'session'}.json"
+        counter = 2
+        while target.exists():
+            target = archive_dir / f"import-{stamp}-{slug or 'session'}-{counter}.json"
+            counter += 1
+        with target.open("x", encoding="utf-8", newline="\n") as stream:
+            json.dump(data, stream, indent=2, ensure_ascii=False)
+            stream.write("\n")
+        imported += 1
+    return imported
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="worktrail",
@@ -478,6 +597,11 @@ def main(argv=None):
     commands.add_parser("resume", help="Show the saved session context")
     commands.add_parser("summary", help="Show a compact session overview")
     commands.add_parser("archive", help="Archive and close the active session")
+    commands.add_parser("timeline", help="Show a chronological view of saved work")
+    export_parser = commands.add_parser("export", help="Export session memory to a portable JSON bundle")
+    export_parser.add_argument("file", type=Path, help="Destination JSON file")
+    import_parser = commands.add_parser("import", help="Import a portable Worktrail JSON bundle")
+    import_parser.add_argument("file", type=Path, help="Bundle to import into the archive")
     search = commands.add_parser("search", help="Search tasks and notes across sessions")
     search.add_argument("query", help="Text to search in tasks and notes")
     commands.add_parser(
@@ -505,6 +629,12 @@ def main(argv=None):
         "handoff",
         help="Prepare a Markdown handoff for your next coding session",
     )
+    context = commands.add_parser(
+        "context",
+        help="Print a coding-agent-ready brief for the current work",
+    )
+    context.add_argument("--next", dest="next_step", help="Record the next step")
+    context.add_argument("--output", type=Path, help="Save the brief to a new file")
     handoff.add_argument(
         "--next",
         dest="next_step",
@@ -520,6 +650,20 @@ def main(argv=None):
     root = Path.cwd()
 
     try:
+        if args.command == "timeline":
+            print(render_timeline(root), end="")
+            return 0
+
+        if args.command == "export":
+            count = export_sessions(root, args.file)
+            print(f"Exported {count} session record(s): {args.file}")
+            return 0
+
+        if args.command == "import":
+            count = import_sessions(root, args.file)
+            print(f"Imported {count} session record(s) into .worktrail/archive/")
+            return 0
+
         if args.command == "archive":
             archived = archive_session(root)
             print(f"Session archived: {archived.name}")
@@ -662,7 +806,7 @@ def main(argv=None):
 
         data = require_session(root)
 
-        if args.command == "handoff":
+        if args.command in ("handoff", "context"):
             next_step = args.next_step
             if next_step is not None and not next_step.strip():
                 raise ValueError("Next step cannot be empty.")
