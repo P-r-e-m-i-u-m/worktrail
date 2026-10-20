@@ -536,7 +536,7 @@ class ArchiveAndSearchFeatureTests(unittest.TestCase):
 
         destination = self.root / "other-project"
         destination.mkdir()
-        with patch("pathlib.Path.cwd", return_value=destination):
+        with patch("worktrail.cli.Path.cwd", return_value=destination):
             code, output, error = self.run_cli("import", str(bundle))
         self.assertEqual(code, 0, error)
         self.assertIn("Imported 2 session record(s)", output)
