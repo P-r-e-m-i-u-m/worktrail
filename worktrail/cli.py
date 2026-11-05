@@ -598,10 +598,10 @@ def import_sessions(root, source):
                     os.link(temporary, target)
                     break
                 except FileExistsError:
-                    counter += 1
                     target = archive_dir / (
                         f"import-{stamp}-{slug or 'session'}-{counter}.json"
                     )
+                    counter += 1
         finally:
             temporary.unlink(missing_ok=True)
         imported += 1
