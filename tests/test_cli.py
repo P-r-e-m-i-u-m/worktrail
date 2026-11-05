@@ -117,6 +117,25 @@ class WorktrailTests(unittest.TestCase):
         )
         self.assertIn("check-ignore", run.call_args.args[0])
 
+    def test_doctor_accepts_root_anchored_worktrail_ignore_rule(self):
+        import subprocess
+
+        subprocess.run(
+            ["git", "-C", str(self.root), "init"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        (self.root / ".gitignore").write_text("/.worktrail/\\n", encoding="utf-8")
+
+        code, output, error = self.run_cli("doctor")
+
+        self.assertEqual(code, 0, error)
+        self.assertIn(
+            "[OK] .worktrail ignored: Git rules ignore .worktrail/session.json",
+            output,
+        )
+
     def test_doctor_warns_when_git_does_not_ignore_session_file(self):
         from unittest.mock import Mock
 
