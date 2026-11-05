@@ -574,9 +574,6 @@ def import_sessions(root, source):
         slug = "".join(c for c in slug if c.isalnum() or c == "-")[:48].strip("-")
         target = archive_dir / f"import-{stamp}-{slug or 'session'}.json"
         counter = 2
-        while target.exists():
-            target = archive_dir / f"import-{stamp}-{slug or 'session'}-{counter}.json"
-            counter += 1
         # Stage a complete file beside the destination, then publish it with
         # a hard link. Unlike Path.replace(), os.link() never overwrites an
         # archive entry if another process creates the target concurrently.
