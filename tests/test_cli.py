@@ -550,6 +550,72 @@ class ArchiveAndSearchFeatureTests(unittest.TestCase):
         self.assertIn("File exists", error)
         self.assertEqual(target.read_text(encoding="utf-8"), "keep me")
 
+    def test_import_cleans_temporary_file_when_atomic_publish_fails(self):
+        import json
+
+        source = self.root / "bundle.json"
+        source.write_text(
+            json.dumps({
+                "format": "worktrail-session-bundle",
+                "version": 1,
+                "sessions": [{
+                    "source": "current",
+                    "session": {
+                        "task": "Keep existing archive",
+                        "started_at": "2026-11-05T10:00:00+00:00",
+                        "checkpoint_at": "2026-11-05T11:00:00+00:00",
+                        "notes": [],
+                        "branch": "main",
+                        "git_status": ""
+                    }
+                }]
+            }),
+            encoding="utf-8",
+        )
+        archive = self.root / ".worktrail" / "archive"
+        archive.mkdir(parents=True)
+        existing = archive / "import-20261105T110000000000-keep-existing-archive.json"
+        existing.write_text("keep this exact content", encoding="utf-8")
+
+        with patch("worktrail.cli.os.link", side_effect=OSError("simulated publish failure")):
+            code, _, error = self.run_cli("import", str(source))
+
+        self.assertEqual(code, 1)
+        self.assertIn("simulated publish failure", error)
+        self.assertEqual(existing.read_text(encoding="utf-8"), "keep this exact content")
+        self.assertEqual(list(archive.glob("*.tmp")), [])
+        self.assertEqual(list(archive.glob("*.json")), [existing])
+
+    def test_import_publishes_complete_file_and_preserves_colliding_archive_entry(self):
+        import json
+
+        source = self.root / "bundle.json"
+        session = {
+            "task": "Keep existing archive",
+            "started_at": "2026-11-05T10:00:00+00:00",
+            "checkpoint_at": "2026-11-05T11:00:00+00:00",
+            "notes": [],
+            "branch": "main",
+            "git_status": ""
+        }
+        source.write_text(json.dumps({
+            "format": "worktrail-session-bundle",
+            "version": 1,
+            "sessions": [{"source": "current", "session": session}]
+        }), encoding="utf-8")
+        archive = self.root / ".worktrail" / "archive"
+        archive.mkdir(parents=True)
+        existing = archive / "import-20261105T110000000000-keep-existing-archive.json"
+        existing.write_text("keep this exact content", encoding="utf-8")
+
+        code, _, error = self.run_cli("import", str(source))
+
+        self.assertEqual(code, 0, error)
+        self.assertEqual(existing.read_text(encoding="utf-8"), "keep this exact content")
+        imported = archive / "import-20261105T110000000000-keep-existing-archive-2.json"
+        self.assertEqual(json.loads(imported.read_text(encoding="utf-8")), session)
+        self.assertEqual(list(archive.glob("*.tmp")), [])
+
     def test_import_rejects_unknown_format_without_writing_archive(self):
         source = self.root / "bad.json"
         source.write_text('{"format":"other","version":1,"sessions":[]}', encoding="utf-8")
