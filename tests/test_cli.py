@@ -574,7 +574,7 @@ class ArchiveAndSearchFeatureTests(unittest.TestCase):
         )
         archive = self.root / ".worktrail" / "archive"
         archive.mkdir(parents=True)
-        existing = archive / "import-20261105T110000000000-keep-existing-archive.json"
+        existing = archive / "import-20261105T1100000000-keep-existing-archive.json"
         existing.write_text("keep this exact content", encoding="utf-8")
 
         with patch("worktrail.cli.os.link", side_effect=OSError("simulated publish failure")):
@@ -605,14 +605,14 @@ class ArchiveAndSearchFeatureTests(unittest.TestCase):
         }), encoding="utf-8")
         archive = self.root / ".worktrail" / "archive"
         archive.mkdir(parents=True)
-        existing = archive / "import-20261105T110000000000-keep-existing-archive.json"
+        existing = archive / "import-20261105T1100000000-keep-existing-archive.json"
         existing.write_text("keep this exact content", encoding="utf-8")
 
         code, _, error = self.run_cli("import", str(source))
 
         self.assertEqual(code, 0, error)
         self.assertEqual(existing.read_text(encoding="utf-8"), "keep this exact content")
-        imported = archive / "import-20261105T110000000000-keep-existing-archive-2.json"
+        imported = archive / "import-20261105T1100000000-keep-existing-archive-2.json"
         self.assertEqual(json.loads(imported.read_text(encoding="utf-8")), session)
         self.assertEqual(list(archive.glob("*.tmp")), [])
 
