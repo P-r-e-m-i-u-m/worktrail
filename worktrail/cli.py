@@ -572,7 +572,8 @@ def import_sessions(root, source):
         stamp = "".join(c for c in data["checkpoint_at"] if c.isalnum())
         slug = "-".join(data["task"].lower().split())
         slug = "".join(c for c in slug if c.isalnum() or c == "-")[:48].strip("-")
-        target = archive_dir / f"import-{stamp}-{slug or 'session'}.json"
+        base_name = f"import-{stamp}-{slug or 'session'}"
+        target = archive_dir / f"{base_name}.json"
         counter = 2
         # Stage a complete file beside the destination, then publish it with
         # a hard link. Unlike Path.replace(), os.link() never overwrites an
@@ -591,13 +592,16 @@ def import_sessions(root, source):
                 os.fsync(stream.fileno())
 
             while True:
+                while target.exists():
+                    target = archive_dir / f"{base_name}-{counter}.json"
+                    counter += 1
                 try:
                     os.link(temporary, target)
                     break
                 except FileExistsError:
-                    target = archive_dir / (
-                        f"import-{stamp}-{slug or 'session'}-{counter}.json"
-                    )
+                    # Another importer may have claimed this name after the
+                    # existence check. Move on and retry without overwriting.
+                    target = archive_dir / f"{base_name}-{counter}.json"
                     counter += 1
         finally:
             temporary.unlink(missing_ok=True)
