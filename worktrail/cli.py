@@ -569,7 +569,7 @@ def import_sessions(root, source):
     archive_dir.mkdir(parents=True, exist_ok=True)
     imported = 0
     for data in validated:
-        stamp = "".join(c for c in data["checkpoint_at"] if c.isalnum())[:20]
+        stamp = "".join(c for c in data["checkpoint_at"] if c.isalnum())
         slug = "-".join(data["task"].lower().split())
         slug = "".join(c for c in slug if c.isalnum() or c == "-")[:48].strip("-")
         target = archive_dir / f"import-{stamp}-{slug or 'session'}.json"
