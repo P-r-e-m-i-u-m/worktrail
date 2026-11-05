@@ -1,7 +1,9 @@
 """Local-first development session tracker."""
 import argparse
 import json
+import os
 import shutil
+import tempfile
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -575,9 +577,33 @@ def import_sessions(root, source):
         while target.exists():
             target = archive_dir / f"import-{stamp}-{slug or 'session'}-{counter}.json"
             counter += 1
-        with target.open("x", encoding="utf-8", newline="\n") as stream:
-            json.dump(data, stream, indent=2, ensure_ascii=False)
-            stream.write("\n")
+        # Stage a complete file beside the destination, then publish it with
+        # a hard link. Unlike Path.replace(), os.link() never overwrites an
+        # archive entry if another process creates the target concurrently.
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=".worktrail-import-",
+            suffix=".tmp",
+            dir=archive_dir,
+        )
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+                json.dump(data, stream, indent=2, ensure_ascii=False)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+
+            while True:
+                try:
+                    os.link(temporary, target)
+                    break
+                except FileExistsError:
+                    counter += 1
+                    target = archive_dir / (
+                        f"import-{stamp}-{slug or 'session'}-{counter}.json"
+                    )
+        finally:
+            temporary.unlink(missing_ok=True)
         imported += 1
     return imported
 
