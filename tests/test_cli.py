@@ -126,7 +126,7 @@ class WorktrailTests(unittest.TestCase):
             text=True,
             check=True,
         )
-        (self.root / ".gitignore").write_text("/.worktrail/\\n", encoding="utf-8")
+        (self.root / ".gitignore").write_text("/.worktrail/\n", encoding="utf-8")
 
         code, output, error = self.run_cli("doctor")
 
