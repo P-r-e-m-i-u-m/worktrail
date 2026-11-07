@@ -484,7 +484,13 @@ def session_records(root):
     for source, path in candidates:
         if not path.is_file():
             continue
-        data = load_path(path)
+        try:
+            data = load_path(path)
+        except (ValueError, OSError) as exc:
+            if source.startswith("archive:"):
+                print(f"Warning: skipped {source}: {exc}", file=sys.stderr)
+                continue
+            raise
         if data is not None:
             records.append({"source": source, "session": data})
     return records
