@@ -37,6 +37,49 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(result, {"branch": "main", "git_status": None})
 
 
+class SnapshotOutputDecodingTests(unittest.TestCase):
+    def test_snapshot_preserves_undecodable_git_path_bytes(self):
+        from unittest.mock import Mock, patch
+        from worktrail.cli import snapshot
+
+        branch_result = Mock(returncode=0, stdout=b"main\n", stderr=b"")
+        status_result = Mock(
+            returncode=0,
+            stdout=b" M normal.txt\n?? invalid-\xff-name.txt\n",
+            stderr=b"",
+        )
+        with patch(
+            "worktrail.cli.subprocess.run",
+            side_effect=[branch_result, status_result],
+        ) as run:
+            result = snapshot(Path.cwd())
+
+        self.assertEqual(result["branch"], "main")
+        self.assertEqual(
+            result["git_status"],
+            " M normal.txt\n?? invalid-\udcff-name.txt",
+        )
+        self.assertNotIn("text", run.call_args_list[0].kwargs)
+
+    def test_snapshot_decodes_unicode_git_output_as_utf8(self):
+        from unittest.mock import Mock, patch
+        from worktrail.cli import snapshot
+
+        branch_result = Mock(returncode=0, stdout="main".encode(), stderr=b"")
+        status_result = Mock(
+            returncode=0,
+            stdout=" M café 文件.txt\n".encode("utf-8"),
+            stderr=b"",
+        )
+        with patch(
+            "worktrail.cli.subprocess.run",
+            side_effect=[branch_result, status_result],
+        ):
+            result = snapshot(Path.cwd())
+
+        self.assertEqual(result["git_status"], " M café 文件.txt")
+
+
 class WorktrailTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
