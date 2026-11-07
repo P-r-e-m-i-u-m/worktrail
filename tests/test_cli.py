@@ -597,7 +597,7 @@ class ArchiveAndSearchFeatureTests(unittest.TestCase):
         self.assertIn("Cannot read session", error)
 
         current.unlink()
-        backup.write_bytes(b"\\xff\\xfe")
+        backup.write_bytes(bytes((0xff, 0xfe)))
         code, _, error = self.run_cli("timeline")
         self.assertEqual(code, 1)
         self.assertIn("not valid UTF-8", error)
