@@ -542,6 +542,66 @@ class ArchiveAndSearchFeatureTests(unittest.TestCase):
         self.assertIn("archive:", output)
         self.assertIn("current", output)
 
+    def test_timeline_skips_malformed_and_non_utf8_archive_records(self):
+        self.assertEqual(self.run_cli("start", "--task", "Healthy session")[0], 0)
+        archive = self.root / ".worktrail" / "archive"
+        archive.mkdir(parents=True)
+        (archive / "broken-json.json").write_text("{broken", encoding="utf-8")
+        (archive / "broken-encoding.json").write_bytes(b"\\xff\\xfe")
+
+        code, output, error = self.run_cli("timeline")
+
+        self.assertEqual(code, 0, error)
+        self.assertIn("Healthy session", output)
+        self.assertIn("Warning: skipped archive:broken-json.json", error)
+        self.assertIn("Warning: skipped archive:broken-encoding.json", error)
+
+    def test_export_skips_bad_archive_and_keeps_valid_records(self):
+        self.assertEqual(self.run_cli("start", "--task", "Healthy session")[0], 0)
+        archive = self.root / ".worktrail" / "archive"
+        archive.mkdir(parents=True)
+        (archive / "broken.json").write_text("{broken", encoding="utf-8")
+        valid = {
+            "task": "Archived session",
+            "started_at": "2026-11-06T10:00:00+00:00",
+            "checkpoint_at": "2026-11-06T11:00:00+00:00",
+            "notes": [],
+            "branch": "main",
+            "git_status": "",
+        }
+        (archive / "valid.json").write_text(
+            __import__("json").dumps(valid), encoding="utf-8"
+        )
+        destination = self.root / "export.json"
+
+        code, output, error = self.run_cli("export", str(destination))
+
+        self.assertEqual(code, 0, error)
+        self.assertIn("Exported 2 session record(s)", output)
+        self.assertIn("Warning: skipped archive:broken.json", error)
+        exported = __import__("json").loads(destination.read_text(encoding="utf-8"))
+        self.assertEqual(
+            [record["session"]["task"] for record in exported["sessions"]],
+            ["Healthy session", "Archived session"],
+        )
+
+    def test_timeline_still_reports_corrupt_current_session_and_backup(self):
+        worktrail = self.root / ".worktrail"
+        worktrail.mkdir()
+        current = worktrail / "session.json"
+        backup = worktrail / "session.json.bak"
+
+        current.write_text("{broken", encoding="utf-8")
+        code, _, error = self.run_cli("timeline")
+        self.assertEqual(code, 1)
+        self.assertIn("Cannot read session", error)
+
+        current.unlink()
+        backup.write_bytes(b"\\xff\\xfe")
+        code, _, error = self.run_cli("timeline")
+        self.assertEqual(code, 1)
+        self.assertIn("not valid UTF-8", error)
+
     def test_export_and_import_round_trip_without_overwriting(self):
         self.assertEqual(self.run_cli("start", "--task", "Fix login")[0], 0)
         self.assertEqual(
