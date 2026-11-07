@@ -908,17 +908,22 @@ def main(argv=None):
             print(f"Branch:     {current['branch']}")
 
             branch_changed = current["branch"] != data.get("branch")
-            tree_changed = current["git_status"] != data.get("git_status")
 
             if branch_changed:
                 print("Branch has changed since the last checkpoint.")
             else:
                 print("Branch matches the last checkpoint.")
 
+            if current["git_status"] is None:
+                print("Working tree comparison is unavailable because Git status could not be read.")
+                return 0
+
+            tree_changed = current["git_status"] != data.get("git_status")
+
             if tree_changed:
                 print("Working tree has changed since the last checkpoint.")
 
-                git_status = current.get("git_status") or ""
+                git_status = current["git_status"]
                 changed_paths = []
 
                 for line in git_status.splitlines():

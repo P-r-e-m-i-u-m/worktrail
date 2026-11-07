@@ -10,6 +10,33 @@ from unittest.mock import patch
 from worktrail import cli
 
 
+class SnapshotTests(unittest.TestCase):
+    def test_snapshot_keeps_status_unavailable_when_git_status_fails(self):
+        from unittest.mock import Mock, patch
+        from worktrail.cli import snapshot
+
+        branch_result = Mock(returncode=0, stdout="main", stderr="")
+        status_result = Mock(returncode=1, stdout="", stderr="fatal: unavailable")
+        with patch("worktrail.cli.subprocess.run", side_effect=[branch_result, status_result]):
+            result = snapshot(Path.cwd())
+
+        self.assertEqual(result, {"branch": "main", "git_status": None})
+
+    def test_snapshot_keeps_status_unavailable_when_git_status_times_out(self):
+        import subprocess
+        from unittest.mock import Mock, patch
+        from worktrail.cli import snapshot
+
+        branch_result = Mock(returncode=0, stdout="main", stderr="")
+        with patch(
+            "worktrail.cli.subprocess.run",
+            side_effect=[branch_result, subprocess.TimeoutExpired("git", 5)],
+        ):
+            result = snapshot(Path.cwd())
+
+        self.assertEqual(result, {"branch": "main", "git_status": None})
+
+
 class WorktrailTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -356,6 +383,32 @@ class WorktrailTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("Branch has changed", output)
         self.assertIn("Working tree has changed", output)
+
+    def test_status_reports_unavailable_git_status_without_clean_claim(self):
+        self.run_cli("start", "--task", "Fix login")
+        with patch(
+            "worktrail.cli.snapshot",
+            return_value={"branch": "main", "git_status": None},
+        ):
+            code, output, _ = self.run_cli("status")
+
+        self.assertEqual(code, 0)
+        self.assertIn("Branch matches the last checkpoint.", output)
+        self.assertIn("Working tree comparison is unavailable", output)
+        self.assertNotIn("Working tree matches", output)
+        self.assertNotIn("Working tree is clean", output)
+
+    def test_status_distinguishes_successful_empty_git_status(self):
+        self.run_cli("start", "--task", "Fix login")
+        with patch(
+            "worktrail.cli.snapshot",
+            return_value={"branch": "main", "git_status": ""},
+        ):
+            code, output, _ = self.run_cli("status")
+
+        self.assertEqual(code, 0)
+        self.assertIn("Working tree matches the last checkpoint.", output)
+        self.assertNotIn("comparison is unavailable", output)
 
     def test_status_lists_changed_files(self):
         self.run_cli("start", "--task", "Fix login")
