@@ -102,12 +102,14 @@ def snapshot(root):
             proc = subprocess.run(
                 ["git", "-C", str(root), *args],
                 capture_output=True,
-                text=True,
                 timeout=5,
                 check=False,
             )
             if proc.returncode == 0:
-                result[key] = proc.stdout.strip()
+                output = proc.stdout
+                if isinstance(output, bytes):
+                    output = output.decode("utf-8", errors="surrogateescape")
+                result[key] = output.strip()
         except (OSError, subprocess.TimeoutExpired):
             pass
 
