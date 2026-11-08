@@ -382,7 +382,10 @@ def write_handoff(path, content):
 
         # Publish only after the complete handoff is on disk. A hard link
         # gives us create-only semantics even if another process wins the race.
-        os.link(temporary, path)
+        try:
+            os.link(temporary, path)
+        except FileExistsError as exc:
+            raise ValueError(f"File exists: {path}") from exc
     finally:
         temporary.unlink(missing_ok=True)
 
