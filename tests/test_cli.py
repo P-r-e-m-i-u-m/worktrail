@@ -708,6 +708,39 @@ class ArchiveAndSearchFeatureTests(unittest.TestCase):
         self.assertIn("File exists", error)
         self.assertEqual(target.read_text(encoding="utf-8"), "keep me")
 
+    def test_export_cleans_temporary_file_when_atomic_publish_fails(self):
+        from unittest.mock import patch
+
+        self.assertEqual(self.run_cli("start", "--task", "Export safely")[0], 0)
+        target = self.root / "nested" / "worktrail-export.json"
+
+        with patch("worktrail.cli.os.link", side_effect=OSError("simulated publish failure")):
+            code, _, error = self.run_cli("export", str(target))
+
+        self.assertEqual(code, 1)
+        self.assertIn("simulated publish failure", error)
+        self.assertFalse(target.exists())
+        self.assertEqual(list(target.parent.glob(".worktrail-export-*.tmp")), [])
+
+    def test_export_does_not_replace_destination_created_before_publish(self):
+        from unittest.mock import patch
+
+        self.assertEqual(self.run_cli("start", "--task", "Export safely")[0], 0)
+        target = self.root / "racing-export.json"
+        real_link = __import__("os").link
+
+        def create_destination_then_link(source, destination):
+            target.write_text("keep this exact content", encoding="utf-8")
+            return real_link(source, destination)
+
+        with patch("worktrail.cli.os.link", side_effect=create_destination_then_link):
+            code, _, error = self.run_cli("export", str(target))
+
+        self.assertEqual(code, 1)
+        self.assertIn("File exists", error)
+        self.assertEqual(target.read_text(encoding="utf-8"), "keep this exact content")
+        self.assertEqual(list(self.root.glob(".worktrail-export-*.tmp")), [])
+
     def test_import_cleans_temporary_file_when_atomic_publish_fails(self):
         import json
 
