@@ -89,6 +89,32 @@ class WorktrailTests(unittest.TestCase):
         self.assertIn("File exists", error)
         self.assertEqual(target.read_text(encoding="utf-8"), "keep this file")
 
+    def test_handoff_output_is_published_only_after_complete_write(self):
+        self.run_cli("start", "--task", "Fix login")
+        target = self.root / "handoff.md"
+
+        code, output, error = self.run_cli(
+            "handoff", "--output", str(target)
+        )
+
+        self.assertEqual(code, 0, error)
+        self.assertIn("Handoff saved:", output)
+        self.assertTrue(target.is_file())
+        self.assertIn("# Work handoff: Fix login", target.read_text(encoding="utf-8"))
+        self.assertEqual(list(self.root.glob(".worktrail-handoff-*.tmp")), [])
+
+    def test_handoff_output_cleans_temporary_file_when_publish_fails(self):
+        self.run_cli("start", "--task", "Fix login")
+        target = self.root / "handoff.md"
+
+        with patch("worktrail.cli.os.link", side_effect=OSError("simulated publish failure")):
+            code, _, error = self.run_cli("handoff", "--output", str(target))
+
+        self.assertEqual(code, 1)
+        self.assertIn("simulated publish failure", error)
+        self.assertFalse(target.exists())
+        self.assertEqual(list(self.root.glob(".worktrail-handoff-*.tmp")), [])
+
     def test_handoff_rejects_blank_next_step(self):
         self.run_cli("start", "--task", "Fix login")
         code, _, error = self.run_cli("handoff", "--next", "   ")
