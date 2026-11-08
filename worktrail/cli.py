@@ -539,7 +539,7 @@ def render_timeline(root):
 
 
 def export_sessions(root, destination):
-    """Export validated session records to a portable JSON bundle."""
+    """Atomically publish a portable JSON bundle without overwriting files."""
     if destination.exists():
         raise ValueError(f"File exists: {destination}")
     bundle = {
@@ -549,9 +549,28 @@ def export_sessions(root, destination):
         "sessions": session_records(root),
     }
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with destination.open("x", encoding="utf-8", newline="\n") as stream:
-        json.dump(bundle, stream, indent=2, ensure_ascii=False)
-        stream.write("\n")
+
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=".worktrail-export-",
+        suffix=".tmp",
+        dir=destination.parent,
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+            json.dump(bundle, stream, indent=2, ensure_ascii=False)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+
+        # Publish only a complete export, and never replace a concurrent file.
+        try:
+            os.link(temporary, destination)
+        except FileExistsError as exc:
+            raise ValueError(f"File exists: {destination}") from exc
+    finally:
+        temporary.unlink(missing_ok=True)
+
     return len(bundle["sessions"])
 
 
