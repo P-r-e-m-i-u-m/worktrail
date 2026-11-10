@@ -349,6 +349,77 @@ class WorktrailTests(unittest.TestCase):
         self.assertEqual(exit_info.exception.code, 0)
         self.assertIn("worktrail 0.1.0", out.getvalue())
 
+    def test_save_uses_unique_temporary_files_and_leaves_no_staging_files(self):
+        from concurrent.futures import ThreadPoolExecutor
+        import json
+
+        self.run_cli("start", "--task", "Initial session")
+        root = self.root
+
+        def save_task(number):
+            cli.save(root, {
+                "task": f"Concurrent task {number}",
+                "started_at": f"2026-11-10T10:00:0{number}+00:00",
+                "checkpoint_at": f"2026-11-10T10:00:0{number}+00:00",
+                "notes": [{"at": "2026-11-10T10:00:00+00:00", "text": str(number)}],
+                "branch": "main",
+                "git_status": "",
+            })
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            list(executor.map(save_task, range(4)))
+
+        current = json.loads((root / ".worktrail" / "session.json").read_text(encoding="utf-8"))
+        self.assertTrue(current["task"].startswith("Concurrent task "))
+        self.assertEqual(
+            list((root / ".worktrail").glob(".session.json.*.tmp")),
+            [],
+        )
+        self.assertEqual(
+            list((root / ".worktrail").glob(".session.json.bak.*.tmp")),
+            [],
+        )
+        backup = json.loads((root / ".worktrail" / "session.json.bak").read_text(encoding="utf-8"))
+        self.assertIsInstance(backup["task"], str)
+
+    def test_session_replace_retries_transient_permission_error(self):
+        with patch(
+            "worktrail.cli.os.replace",
+            side_effect=[PermissionError("sharing violation"), None],
+        ) as replace:
+            cli._replace_with_retry(Path("staged.tmp"), Path("session.json"))
+
+        self.assertEqual(replace.call_count, 2)
+
+    def test_save_failure_keeps_current_session_and_cleans_temporary_file(self):
+        import json
+
+        self.run_cli("start", "--task", "Keep current session")
+        current_path = self.root / ".worktrail" / "session.json"
+        before = current_path.read_bytes()
+
+        with patch("worktrail.cli.os.replace", side_effect=OSError("simulated replace failure")):
+            with self.assertRaises(OSError):
+                cli.save(self.root, {
+                    "task": "Must not replace current",
+                    "started_at": "2026-11-10T10:00:00+00:00",
+                    "checkpoint_at": "2026-11-10T10:00:00+00:00",
+                    "notes": [],
+                    "branch": "main",
+                    "git_status": "",
+                })
+
+        self.assertEqual(current_path.read_bytes(), before)
+        self.assertEqual(
+            list((self.root / ".worktrail").glob(".session.json.*.tmp")),
+            [],
+        )
+        self.assertEqual(
+            list((self.root / ".worktrail").glob(".session.json.bak.*.tmp")),
+            [],
+        )
+        self.assertEqual(json.loads(before)["task"], "Keep current session")
+
     def test_start_and_resume(self):
         code, _, _ = self.run_cli("start", "--task", "Fix login")
         self.assertEqual(code, 0)
