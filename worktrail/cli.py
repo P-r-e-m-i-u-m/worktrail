@@ -206,6 +206,24 @@ def save(root, data):
     _atomic_write(path, content)
 
 
+def _atomic_create(path, content):
+    """Publish a complete file only if its destination is still absent."""
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def recover(root):
     """Restore a valid backup only when the current session is absent."""
     current = session_file(root)
@@ -221,14 +239,19 @@ def recover(root):
     if data is None:
         raise ValueError("No recovery backup found.")
 
-    # Revalidate and write a new current session without touching the backup.
+    # A create-only link closes the race between the existence check and
+    # publication. A concurrently created session is never replaced.
     current.parent.mkdir(parents=True, exist_ok=True)
-    temporary = current.with_suffix(".tmp")
-    temporary.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    temporary.replace(current)
+    content = (
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+    ).encode("utf-8")
+    try:
+        _atomic_create(current, content)
+    except FileExistsError as exc:
+        raise ValueError(
+            "A session already exists. Recovery will not overwrite it; "
+            "move the current session aside yourself if you need the backup."
+        ) from exc
     return data
 
 
