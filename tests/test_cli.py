@@ -246,6 +246,30 @@ class WorktrailTests(unittest.TestCase):
         self.assertIn("will not overwrite it", error)
         self.assertEqual(current.read_text(encoding="utf-8"), before)
 
+    def test_recover_does_not_overwrite_session_created_during_publish(self):
+        self.run_cli("start", "--task", "Original task")
+        self.run_cli("checkpoint", "--note", "Backup note")
+        current = self.root / ".worktrail" / "session.json"
+        current.unlink()
+        competing = b'{"task":"Concurrent session"}\\n'
+        real_link = __import__("os").link
+
+        def create_competing_session(source, destination):
+            Path(destination).write_bytes(competing)
+            return real_link(source, destination)
+
+        with patch("worktrail.cli.os.link", side_effect=create_competing_session):
+            code, _, error = self.run_cli("recover")
+
+        self.assertEqual(code, 1)
+        self.assertIn("will not overwrite it", error)
+        self.assertEqual(current.read_bytes(), competing)
+        self.assertTrue((self.root / ".worktrail" / "session.json.bak").exists())
+        self.assertEqual(
+            list(current.parent.glob(".session.json.*.tmp")),
+            [],
+        )
+
     def test_recover_fails_cleanly_without_backup(self):
         code, _, error = self.run_cli("recover")
 
