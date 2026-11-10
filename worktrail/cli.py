@@ -158,25 +158,39 @@ def backup_file(root):
     return session_file(root).with_suffix(".json.bak")
 
 
+def _atomic_write(path, content):
+    """Write complete bytes to a unique sibling file, then replace the target."""
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def save(root, data):
     """Atomically save a session and preserve the previous valid version."""
     path = session_file(root)
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(".tmp")
     backup = backup_file(root)
-    backup_temporary = backup.with_suffix(".tmp")
 
     if path.exists():
-        # Preserve the previous session before replacing it. Never overwrite
-        # a backup until its complete contents have been written.
-        backup_temporary.write_bytes(path.read_bytes())
-        backup_temporary.replace(backup)
+        # Preserve the previous session before replacing it. A unique staging
+        # file prevents concurrent Worktrail processes from sharing a temp path.
+        _atomic_write(backup, path.read_bytes())
 
-    temporary.write_text(
-        json.dumps(data, indent=2, ensure_ascii=False) + "\n",
-        encoding="utf-8",
-    )
-    temporary.replace(path)
+    content = (
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n"
+    ).encode("utf-8")
+    _atomic_write(path, content)
 
 
 def recover(root):
