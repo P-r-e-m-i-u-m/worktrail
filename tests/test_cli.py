@@ -382,6 +382,15 @@ class WorktrailTests(unittest.TestCase):
         backup = json.loads((root / ".worktrail" / "session.json.bak").read_text(encoding="utf-8"))
         self.assertIsInstance(backup["task"], str)
 
+    def test_session_replace_retries_transient_permission_error(self):
+        with patch(
+            "worktrail.cli.os.replace",
+            side_effect=[PermissionError("sharing violation"), None],
+        ) as replace:
+            cli._replace_with_retry(Path("staged.tmp"), Path("session.json"))
+
+        self.assertEqual(replace.call_count, 2)
+
     def test_save_failure_keeps_current_session_and_cleans_temporary_file(self):
         import json
 
