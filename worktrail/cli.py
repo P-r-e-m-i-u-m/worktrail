@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from . import __version__
@@ -158,6 +159,18 @@ def backup_file(root):
     return session_file(root).with_suffix(".json.bak")
 
 
+def _replace_with_retry(source, destination):
+    """Retry transient Windows sharing violations during concurrent replacement."""
+    for attempt in range(8):
+        try:
+            os.replace(source, destination)
+            return
+        except PermissionError:
+            if attempt == 7:
+                raise
+            time.sleep(0.01 * (attempt + 1))
+
+
 def _atomic_write(path, content):
     """Write complete bytes to a unique sibling file, then replace the target."""
     descriptor, temporary_name = tempfile.mkstemp(
@@ -171,7 +184,7 @@ def _atomic_write(path, content):
             stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        _replace_with_retry(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
 
