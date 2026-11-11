@@ -1,5 +1,7 @@
 """Tests for Worktrail's command-line interface."""
 
+import json
+
 import contextlib
 import io
 import tempfile
@@ -658,6 +660,47 @@ class ArchiveAndSearchFeatureTests(unittest.TestCase):
         self.assertEqual(
             len(list((self.root / ".worktrail" / "archive").glob("*.json"))), 1
         )
+
+    def test_archive_does_not_replace_concurrent_archive_entry(self):
+        import os
+
+        self.run_cli("start", "--task", "Concurrent archive")
+        archive_dir = self.root / ".worktrail" / "archive"
+        real_link = os.link
+        created = []
+
+        def create_competing_entry(source, destination):
+            destination = Path(destination)
+            if not created:
+                destination.write_bytes(b"existing archive entry")
+                created.append(destination)
+            return real_link(source, destination)
+
+        with patch("worktrail.cli.os.link", side_effect=create_competing_entry):
+            code, _, error = self.run_cli("archive")
+
+        self.assertEqual(code, 0, error)
+        self.assertTrue((self.root / ".worktrail" / "session.json").exists() is False)
+        self.assertEqual(created[0].read_bytes(), b"existing archive entry")
+        archived = [path for path in archive_dir.glob("*.json") if path != created[0]]
+        self.assertEqual(len(archived), 1)
+        self.assertEqual(json.loads(archived[0].read_text(encoding="utf-8"))["task"], "Concurrent archive")
+        self.assertEqual(list(archive_dir.glob(".worktrail-archive-*.tmp")), [])
+
+    def test_archive_publish_failure_keeps_active_session(self):
+        self.run_cli("start", "--task", "Keep this session")
+        current = self.root / ".worktrail" / "session.json"
+
+        with patch("worktrail.cli.os.link", side_effect=OSError("disk unavailable")):
+            code, _, error = self.run_cli("archive")
+
+        self.assertEqual(code, 1)
+        self.assertIn("disk unavailable", error)
+        self.assertTrue(current.exists())
+        self.assertEqual(json.loads(current.read_text(encoding="utf-8"))["task"], "Keep this session")
+        archive_dir = self.root / ".worktrail" / "archive"
+        self.assertEqual(list(archive_dir.glob("*.json")), [])
+        self.assertEqual(list(archive_dir.glob(".worktrail-archive-*.tmp")), [])
 
     def test_archive_requires_active_session(self):
         code, _, error = self.run_cli("archive")
