@@ -454,25 +454,39 @@ def archive_session(root):
     slug = "-".join(data["task"].lower().split())
     slug = "".join(c for c in slug if c.isalnum() or c == "-")[:48].strip("-")
     slug = slug or "session"
-    target = archive_dir / f"{stamp}-{slug}.json"
+    base_name = f"{stamp}-{slug}"
+    target = archive_dir / f"{base_name}.json"
     counter = 2
-    while target.exists():
-        target = archive_dir / f"{stamp}-{slug}-{counter}.json"
-        counter += 1
 
-    temporary = target.with_suffix(".tmp")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=".worktrail-archive-",
+        suffix=".tmp",
+        dir=archive_dir,
+    )
+    temporary = Path(temporary_name)
     try:
-        temporary.write_text(
-            json.dumps(data, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        temporary.rename(target)
-        current.unlink()
-    except Exception:
-        if temporary.exists():
-            temporary.unlink()
-        raise
+        with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as stream:
+            json.dump(data, stream, indent=2, ensure_ascii=False)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
 
+        # Publish without replacing an archive entry created by another process.
+        while True:
+            while target.exists():
+                target = archive_dir / f"{base_name}-{counter}.json"
+                counter += 1
+            try:
+                os.link(temporary, target)
+                break
+            except FileExistsError:
+                target = archive_dir / f"{base_name}-{counter}.json"
+                counter += 1
+    finally:
+        temporary.unlink(missing_ok=True)
+
+    # Close the active session only after the archive copy is safely published.
+    current.unlink()
     return target
 
 
