@@ -1,5 +1,7 @@
 """Tests for Worktrail's command-line interface."""
 
+import json
+
 import contextlib
 import io
 import tempfile
